@@ -1,0 +1,32 @@
+apiVersion: "v1"
+kind: "RulesConfig"
+config:
+  autoReload: false
+  reloadInterval: "5m"
+  environment: "test"
+clusterEnvironments:
+  test-cluster: "test"
+rules:
+  - id: "node-high-cpu"
+    name: "节点CPU使用率过高"
+    description: "节点CPU使用率过高"
+    category: "node"
+    condition:
+      metric: "cpu_utilization"
+      operator: ">="
+      threshold: 90
+    severity: "critical"
+    remediation: "考虑增加节点或调整工作负载分布"
+    enabled: true
+  
+  - id: "node-high-memory"
+    name: "节点内存使用率过高"
+    description: "节点内存使用率过高"
+    category: "node"
+    condition:
+      metric: "memory_utilization"
+      operator: ">="
+      threshold: 85
+    severity: "warning"
+    remediation: "监控内存使用情况，必要时增加资源"
+    enabled: true 

@@ -13,14 +13,180 @@ K8s-Resource-Inspector 是一个专注于 Kubernetes 资源配置审计、合规
 - **灵活报告**：支持多种报告格式和输出方式
 - **自动化集成**：支持与 CI/CD 流程集成，实现自动化巡检
 
-## 与监控系统的区别
+## 安装与使用
 
-与 Prometheus 等监控系统不同，K8s-Resource-Inspector 专注于：
+### 安装方法
 
-- **配置审计**而非运行时指标监控
-- **最佳实践验证**而非性能数据收集
-- **定期巡检报告**而非实时监控告警
-- **多集群配置一致性**检查
+#### 方法1: 使用预编译二进制文件
+
+1. 从 GitHub Releases 页面下载最新版本的二进制文件
+2. 解压并移动到系统路径中:
+
+```bash
+# Linux/MacOS
+chmod +x inspector
+sudo mv inspector /usr/local/bin/
+
+# Windows
+# 将inspector.exe移动到你的PATH路径中
+```
+
+#### 方法2: 从源码构建
+
+需要Go 1.17+版本:
+
+```bash
+git clone https://github.com/FreshMan1123/k8s-resource-inspector.git
+cd k8s-resource-inspector/code
+go build -o inspector cmd/inspector/main.go
+```
+
+#### 方法3: 使用Docker镜像
+
+```bash
+docker pull freshman1123/k8s-resource-inspector:latest
+docker run --rm -v ~/.kube:/root/.kube freshman1123/k8s-resource-inspector:latest cluster info
+```
+
+### 使用指南
+
+#### 集群管理
+
+K8s-Resource-Inspector支持管理多个Kubernetes集群的配置:
+
+```bash
+# 列出所有可用的集群上下文
+inspector cluster list
+
+# 切换当前集群上下文
+inspector cluster use my-cluster
+
+# 显示当前集群信息
+inspector cluster info
+
+# 添加新的集群配置
+inspector cluster add --name production --file /path/to/kubeconfig
+```
+
+#### 资源管理
+
+查看和管理集群中的各种资源:
+
+```bash
+# 获取所有命名空间中的资源
+inspector resource get pods --all-namespaces
+
+# 获取特定命名空间的资源
+inspector resource get deployments -n kube-system
+
+# 列出命名空间
+inspector resource namespace list
+```
+
+#### 资源巡检
+
+进行资源配置审计和健康检查:
+
+```bash
+# 检查节点状态
+inspector inspect node
+
+# 使用自定义规则文件进行检查
+inspector inspect node --rules-file /path/to/rules.yaml
+
+# 生成JSON格式报告并保存到文件
+inspector inspect node --output json --output-file node-report.json
+
+# 只显示有问题的资源
+inspector inspect node --only-issues
+```
+
+### 常用示例
+
+#### 示例1: 生成节点健康报告
+
+```bash
+# 生成详细的节点健康报告
+inspector inspect node --output text
+```
+
+输出示例:
+```
+========================================
+    K8S RESOURCE INSPECTOR REPORT
+========================================
+
+Generated: Wed, 23 Jun 2023 14:30:45 CST
+Cluster:   production
+
+SUMMARY
+----------------------------------------
+Total resources analyzed:    5
+Resources with issues:       2
+
+Issue severity breakdown:
+  CRITICAL 1
+  ERROR    2
+  WARNING  3
+  INFO     1
+
+FINDINGS
+----------------------------------------
+
+Resource: Node/worker-1
+-----------------------
+[WARNING] Rule: node-cpu-usage
+Message: 节点CPU使用率过高
+Recommendation: 考虑添加更多节点或优化工作负载
+CPU Utilization: 85.3%
+Memory Utilization: 67.2%
+```
+
+#### 示例2: 检查特定命名空间的资源
+
+```bash
+# 检查生产命名空间中的所有Pods
+inspector resource get pods -n production
+```
+
+## 配置与自定义
+
+### 规则配置
+
+K8s-Resource-Inspector使用YAML格式的规则文件定义检查标准。规则文件示例:
+
+```yaml
+apiVersion: v1
+kind: RulesConfig
+config:
+  environment: prod
+clusterEnvironments:
+  production-cluster: prod
+  staging-cluster: dev
+  default: dev
+rules:
+  - id: node-cpu-usage
+    name: "节点CPU使用率检查"
+    description: "检查节点CPU使用率是否超过阈值"
+    category: node
+    severity: warning
+    condition:
+      metric: cpu.utilization
+      operator: "<"
+      thresholds:
+        prod: 80
+        dev: 90
+    remediation: "考虑添加更多节点或优化工作负载"
+    enabled: true
+```
+
+### 输出格式
+
+支持多种输出格式:
+
+- `text`: 人类可读的格式化文本 (默认)
+- `json`: JSON格式，便于程序处理
+- `yaml`: YAML格式输出
 
 ## 项目结构
 
@@ -62,27 +228,30 @@ code/
 └── pkg/                      # 可供外部使用的包(预留)
 ```
 
-### 模块说明
+## 常见问题
 
-#### cmd - 命令行界面
-包含所有命令行入口点，使用Cobra框架构建CLI界面。负责参数解析、帮助信息展示和调用内部功能模块。
+### Q: 为什么需要设置自定义规则文件?
 
-#### internal - 内部实现
-不对外暴露的内部实现代码，包含核心业务逻辑：
+A: 默认规则适用于一般场景，但不同组织有不同的标准和需求。通过自定义规则文件，可以根据组织特定要求调整检查标准。
 
-- **collector**: 数据收集层，负责从Kubernetes集群收集资源指标和状态
-- **rules**: 规则引擎，负责加载、解析和评估配置规则
-- **analyzer**: 分析器，将收集的数据与规则进行评估，生成分析报告
-- **cluster**: 处理集群连接、认证和API调用
-- **kubeconfig**: 管理kubeconfig文件的读写和上下文切换
-- **models**: 定义数据结构和检查结果模型
+### Q: 如何在CI/CD流程中集成K8s-Resource-Inspector?
 
-#### configs - 配置文件
-存放可由用户自定义的配置文件：
-- **rules**: 以YAML格式定义的检查规则，非开发人员也可以编辑
+A: 可以在部署前的验证阶段运行检查命令，例如:
 
-#### pkg - 公共包
-可能被其他项目引用的公共功能。目前为预留目录，随项目发展逐步扩充。
+```bash
+inspector inspect node --output json --output-file report.json --only-issues
+# 根据report.json的内容决定是否允许部署
+```
+
+### Q: 工具报告某些问题，但实际上这是预期行为，如何忽略?
+
+A: 可以通过以下方式解决:
+1. 修改规则文件，关闭或调整特定规则
+2. 使用`--rules-file`参数指定自定义规则文件
+
+## 贡献指南
+
+我们欢迎社区贡献，请参考[贡献指南](CONTRIBUTING.md)了解如何参与项目开发。
 
 ## 迭代规划
 
@@ -174,59 +343,3 @@ code/
 - **插件系统**：支持自定义规则和报告格式
 - **高级分析**：基于历史数据的趋势分析
 - **自动修复**：对于常见问题提供自动修复能力 
-
-
-
-天1：项目初始化与环境搭建
-上午：创建项目结构、设置Go模块依赖
-下午：实现安全的kubeconfig管理
-晚上：搭建本地测试环境(Kind集群)
-天2：核心连接与资源获取
-上午：实现集群客户端模块
-下午：开发基础资源获取功能(Pod, Deployment)
-晚上：扩展资源获取(Service, ConfigMap, Secret)
-天3：命令行界面与资源检查
-上午：创建CLI框架(使用cobra)
-下午：实现资源列表与过滤功能
-晚上：开发资源健康状态检查
-天4：规则引擎基础
-上午：设计规则引擎架构
-下午：实现规则评估系统
-晚上：添加基础内置规则集
-天5：多集群支持与并行处理
-上午：实现多集群配置管理
-下午：开发集群切换功能
-晚上：添加并行巡检能力
-天6-7：报告系统与测试
-上午：开发多格式报告生成器(文本、JSON)
-下午：实现报告模板系统
-晚上：编写单元测试与集成测试
-第二周：高级功能与企业级特性
-天8：高级规则与合规检查
-上午：实现CIS基准检查规则
-下午：添加最佳实践验证规则
-晚上：开发自定义规则导入功能
-天9：资源优化建议
-上午：实现资源请求/限制分析
-下午：开发资源使用效率检查
-晚上：添加优化建议生成功能
-天10：历史数据与比较
-上午：设计历史数据存储系统
-下午：实现报告存储与检索
-晚上：开发历史比较功能
-天11：告警集成
-上午：设计告警系统架构
-下午：实现Slack/Email通知
-晚上：添加告警条件配置
-天12：容器化与自动化
-上午：编写Dockerfile(多阶段构建)
-下午：创建Kubernetes部署清单
-晚上：设置GitHub Actions CI流程
-天13：文档与示例
-上午：编写详细使用文档
-下午：创建教程与示例
-晚上：完善API文档
-天14：性能优化与发布准备
-上午：进行性能测试与优化
-下午：修复发现的问题
-晚上：准备v0.1版本发布 m

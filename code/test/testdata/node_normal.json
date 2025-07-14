@@ -1,0 +1,23 @@
+{
+  "name": "test-node",
+  "capacity": {
+    "cpu": "4",
+    "memory": "8Gi"
+  },
+  "metrics": {
+    "cpuUsage": "1.5",
+    "memoryUsage": "3Gi"
+  },
+  "pods": [
+    {
+      "name": "test-pod-1",
+      "namespace": "default",
+      "resources": {
+        "requests": {
+          "cpu": "0.5",
+          "memory": "1Gi"
+        }
+      }
+    }
+  ]
+} 
