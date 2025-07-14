@@ -30,8 +30,24 @@ func NewClient(configPath string, contextName string) (*Client, error) {
 		}
 	}
 
-	// 加载kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", configPath)
+	// 创建加载kubeconfig的配置
+	loadingRules := &clientcmd.ClientConfigLoadingRules{
+		ExplicitPath: configPath,
+	}
+	
+	// 创建上下文覆盖配置
+	overrides := &clientcmd.ConfigOverrides{}
+	
+	// 如果指定了上下文名称，则使用它
+	if contextName != "" {
+		overrides.CurrentContext = contextName
+	}
+	
+	// 使用加载规则和覆盖配置创建clientConfig
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
+	
+	// 构建rest.Config
+	config, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("加载kubeconfig失败: %w", err)
 	}

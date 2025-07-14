@@ -31,6 +31,7 @@ func init() {
 	
 	// 添加子命令
 	resourceCmd.AddCommand(resource.NewGetCommand(&namespace, &allNamespaces))
+	resourceCmd.AddCommand(resource.NewNamespaceCommand())
 	
 	// 添加resource命令到根命令
 	rootCmd.AddCommand(resourceCmd)
