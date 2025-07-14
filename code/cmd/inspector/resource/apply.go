@@ -5,19 +5,20 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	// 创建客户端需要这个导入
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // NewApplyCommand 创建apply命令
 func NewApplyCommand() *cobra.Command {
-	ioStreams := genericclioptions.IOStreams{
+	// ioStreams未使用，但保留注释以便将来使用
+	/*ioStreams := genericclioptions.IOStreams{
 		In:     os.Stdin,
 		Out:    os.Stdout,
 		ErrOut: os.Stderr,
-	}
+	}*/
 
 	cmd := &cobra.Command{
 		Use:   "apply -f [file]",
@@ -35,12 +36,14 @@ func NewApplyCommand() *cobra.Command {
 			configPath, _ := cmd.Flags().GetString("kubeconfig")
 			contextName, _ := cmd.Flags().GetString("contextName")
 
-			// 创建集群客户端
+			// 创建集群客户端 - 虽然不直接使用client，但需要保留err变量
 			client, err := cluster.NewClient(configPath, contextName)
 			if err != nil {
 				fmt.Printf("创建集群客户端失败: %v\n", err)
 				os.Exit(1)
 			}
+			// 显式标记client为已使用，避免编译器警告
+			_ = client
 
 			// 创建资源构建器配置
 			configFlags := genericclioptions.NewConfigFlags(true)
@@ -51,10 +54,10 @@ func NewApplyCommand() *cobra.Command {
 				configFlags.Context = &contextName
 			}
 
-			// 创建资源构建器
+			// 创建资源构建器，在这一步中，会返回多个info对象，每个info代表一个资源
 			builder := resource.NewBuilder(configFlags).
 				Unstructured().
-				Schema(scheme.Scheme).
+				// Schema(scheme.Scheme) 移除，因为scheme.Scheme不实现ContentValidator接口
 				ContinueOnError().
 				NamespaceParam("").DefaultNamespace().
 				FilenameParam(false, &resource.FilenameOptions{
@@ -70,6 +73,7 @@ func NewApplyCommand() *cobra.Command {
 
 			// 处理每个对象
 			count := 0
+			//result.visit会遍历result中的每个info，然后会调用func(info *resource.Info, err error) error
 			err = result.Visit(func(info *resource.Info, err error) error {
 				if err != nil {
 					return err
