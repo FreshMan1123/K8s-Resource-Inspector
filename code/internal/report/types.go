@@ -18,6 +18,26 @@ const (
 	SeverityCritical Severity = "CRITICAL" // 严重级别
 )
 
+// NodeDetail 表示节点的详细信息
+type NodeDetail struct {
+	// 节点名称
+	Name string `json:"name"`
+	// 节点就绪状态
+	Ready bool `json:"ready"`
+	// CPU利用率
+	CPUUtilization float64 `json:"cpuUtilization"`
+	// 内存利用率
+	MemoryUtilization float64 `json:"memoryUtilization"`
+	// 运行中的Pod数量
+	RunningPods int `json:"runningPods"`
+	// 最大Pod数量
+	MaxPods int `json:"maxPods"`
+	// Pod利用率
+	PodUtilization float64 `json:"podUtilization"`
+	// 健康评分
+	HealthScore int `json:"healthScore"`
+}
+
 // Finding 表示分析过程中发现的单个问题
 type Finding struct {
 	// ResourceName 是有问题的资源名称
@@ -44,6 +64,8 @@ type Report struct {
 	ClusterName string `json:"clusterName,omitempty"`
 	// Namespace 被分析的命名空间，如果适用
 	Namespace string `json:"namespace,omitempty"`
+	// NodeDetails 包含所有节点的详细信息
+	NodeDetails []NodeDetail `json:"nodeDetails,omitempty"`
 	// Findings 包含所有检测到的问题
 	Findings []Finding `json:"findings"`
 	// Summary 包含报告的汇总统计信息

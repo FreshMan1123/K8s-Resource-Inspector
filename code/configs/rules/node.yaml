@@ -1,0 +1,57 @@
+apiVersion: "v1"
+kind: "RulesConfig"
+config:
+  autoReload: true
+  reloadInterval: "5m"
+  environment: "test"
+clusterEnvironments:
+  "default-cluster": "test"
+rules:
+  # CPU相关规则
+  - id: "node-high-cpu"
+    name: "节点CPU使用率过高"
+    description: "节点CPU使用率过高"
+    category: "node"
+    condition:
+      metric: "cpu_utilization"
+      operator: ">="
+      threshold: 90
+    severity: "critical"
+    remediation: "考虑增加节点或调整工作负载分布"
+    enabled: true
+  
+  - id: "node-high-memory"
+    name: "节点内存使用率过高"
+    description: "节点内存使用率过高"
+    category: "node"
+    condition:
+      metric: "memory_utilization"
+      operator: ">="
+      threshold: 85
+    severity: "warning"
+    remediation: "监控内存使用情况，必要时增加资源"
+    enabled: true
+  
+  - id: "node-high-disk"
+    name: "节点磁盘使用率过高"
+    description: "节点临时存储使用率过高"
+    category: "node"
+    condition:
+      metric: "ephemeral_storage_utilization"
+      operator: ">="
+      threshold: 80
+    severity: "warning"
+    remediation: "清理节点上的临时文件或扩展存储容量"
+    enabled: true
+  
+  - id: "node-high-pods"
+    name: "节点Pod数量过多"
+    description: "节点上运行的Pod数量接近上限"
+    category: "node"
+    condition:
+      metric: "pods_utilization"
+      operator: ">="
+      threshold: 80
+    severity: "info"
+    remediation: "考虑扩展集群，增加更多节点"
+    enabled: true 

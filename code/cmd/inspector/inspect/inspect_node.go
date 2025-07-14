@@ -63,10 +63,10 @@ func runNodeInspect(nodeName string) error {
 		return fmt.Errorf("创建集群客户端失败: %w", err)
 	}
 
-	// 获取集群信息
-	clusterInfo, err := client.GetClusterInfo()
-	if err != nil {
-		return fmt.Errorf("获取集群信息失败: %w", err)
+	// 获取集群信息 - 这里使用现有的client方法
+	clusterName := "default-cluster"
+	if *contextName != "" {
+		clusterName = *contextName
 	}
 
 	// 加载规则配置
@@ -84,18 +84,19 @@ func runNodeInspect(nodeName string) error {
 		return fmt.Errorf("加载规则引擎失败: %w", err)
 	}
 
-	// 获取分析器
-	analyzer := node.NewAnalyzer(client)
+	// 创建分析器并设置客户端
+	analyzer := node.NewNodeAnalyzer(rulesEngine)
+	analyzer.SetClient(client)
 
 	// 分析节点
 	var results []node.AnalysisResult
 	if nodeName != "" {
 		// 分析单个节点
-		result, err := analyzer.AnalyzeNode(nodeName)
+		result, err := analyzer.AnalyzeNodeByName(nodeName)
 		if err != nil {
 			return fmt.Errorf("分析节点 %s 失败: %w", nodeName, err)
 		}
-		results = []node.AnalysisResult{result}
+		results = []node.AnalysisResult{*result}
 	} else {
 		// 分析所有节点
 		results, err = analyzer.AnalyzeAllNodes()
@@ -108,18 +109,27 @@ func runNodeInspect(nodeName string) error {
 	if *onlyIssues {
 		filteredResults := []node.AnalysisResult{}
 		for _, result := range results {
-			if len(result.Violations) > 0 {
+			// 检查是否有未通过的分析项
+			hasIssues := false
+			for _, item := range result.Items {
+				if !item.Passed {
+					hasIssues = true
+					break
+				}
+			}
+			if hasIssues {
 				filteredResults = append(filteredResults, result)
 			}
 		}
 		results = filteredResults
 	}
 
-	// 获取规则列表
-	rulesList := rulesEngine.GetRules()
+	// 获取规则列表 - 添加空的过滤器参数
+	filter := rules.RuleFilter{}
+	rulesList := rulesEngine.GetRules(filter)
 
 	// 创建报告生成器
-	reportGenerator := report.NewGenerator(clusterInfo.Name, "")
+	reportGenerator := report.NewGenerator(clusterName, "")
 	nodeReport := reportGenerator.GenerateNodeReport(results, rulesList)
 
 	// 创建格式化器

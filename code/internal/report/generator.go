@@ -1,6 +1,7 @@
 package report
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node"
@@ -29,6 +30,7 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 		ClusterName: g.ClusterName,
 		Namespace:   g.Namespace,
 		Findings:    make([]Finding, 0),
+		NodeDetails: make([]NodeDetail, 0, len(results)),
 		Summary: ReportSummary{
 			TotalResources:     len(results),
 			ResourcesWithIssues: 0,
@@ -51,6 +53,33 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 	resourcesWithIssues := make(map[string]bool)
 	
 	for _, result := range results {
+		// 添加节点详情
+		nodeDetail := NodeDetail{
+			Name:        result.NodeName,
+			HealthScore: result.HealthScore,
+		}
+		
+		// 查找CPU、内存和Pod利用率
+		for _, item := range result.Items {
+			switch item.Metric {
+			case "cpu_utilization":
+				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
+					nodeDetail.CPUUtilization = val
+				}
+			case "memory_utilization":
+				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
+					nodeDetail.MemoryUtilization = val
+				}
+			case "pods_utilization":
+				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
+					nodeDetail.PodUtilization = val
+				}
+			}
+		}
+		
+		// 添加到报告
+		report.NodeDetails = append(report.NodeDetails, nodeDetail)
+		
 		// 查找未通过的分析项
 		for _, item := range result.Items {
 			if !item.Passed {

@@ -49,6 +49,8 @@ type RuleResult struct {
 	// 规则名称
 	RuleName string `json:"rule_name"`
 	// 检查结果：通过(true)或失败(false)
+	// Passed=true 表示检查通过，规则条件未被触发（如CPU使用率<阈值）
+	// Passed=false 表示检查失败，规则条件被触发（如CPU使用率>=阈值）
 	Passed bool `json:"passed"`
 	// 实际值
 	ActualValue interface{} `json:"actual_value"`

@@ -96,7 +96,7 @@ func (c *MockClusterClient) GetNode(nodeName string) (*models.Node, error) {
 	
 	// 计算分配给Pod的资源（简化）
 	cpuAllocated := resource.NewQuantity(0, resource.DecimalSI)
-	memAllocated := resource.NewQuantity(0, resource.DecimalSI)
+	memAllocated := resource.NewQuantity(0, resource.BinarySI)
 	
 	for _, pod := range data.Pods {
 		podCPU, _ := resource.ParseQuantity(pod.Resources.Requests.CPU)
@@ -200,6 +200,18 @@ func TestNormalNodeInspection(t *testing.T) {
 		t.Fatalf("获取节点数据失败: %v", err)
 	}
 
+	// 打印节点数据，便于调试
+	t.Logf("正常节点CPU使用率: %.2f%%", nodeData.CPU.Utilization)
+	t.Logf("正常节点内存使用率: %.2f%%", nodeData.Memory.Utilization)
+
+	// 确保测试数据符合预期 - CPU和内存使用率都应低于阈值
+	if nodeData.CPU.Utilization >= 90 {
+		t.Fatalf("正常节点CPU使用率应低于90%%，实际为%.2f%%", nodeData.CPU.Utilization)
+	}
+	if nodeData.Memory.Utilization >= 85 {
+		t.Fatalf("正常节点内存使用率应低于85%%，实际为%.2f%%", nodeData.Memory.Utilization)
+	}
+
 	// 分析节点
 	result, err := analyzer.AnalyzeNode(nodeData)
 	if err != nil {
@@ -211,17 +223,13 @@ func TestNormalNodeInspection(t *testing.T) {
 	for _, item := range result.Items {
 		if !item.Passed {
 			failedItems++
+			t.Logf("未通过: %s - %s (值: %s, 阈值: %s)", item.Name, item.Description, item.Value, item.Threshold)
 		}
 	}
 
 	// 验证结果 - 正常节点不应该有未通过的项目
 	if failedItems > 0 {
 		t.Errorf("正常节点不应有未通过项目，实际发现 %d 个", failedItems)
-		for _, item := range result.Items {
-			if !item.Passed {
-				t.Logf("未通过: %s - %s", item.Name, item.Description)
-			}
-		}
 	}
 }
 
@@ -252,6 +260,18 @@ func TestHighLoadNodeInspection(t *testing.T) {
 		t.Fatalf("获取节点数据失败: %v", err)
 	}
 
+	// 打印节点数据，便于调试
+	t.Logf("高负载节点CPU使用率: %.2f%%", nodeData.CPU.Utilization)
+	t.Logf("高负载节点内存使用率: %.2f%%", nodeData.Memory.Utilization)
+
+	// 确保测试数据符合预期 - CPU和内存使用率都应高于阈值
+	if nodeData.CPU.Utilization < 90 {
+		t.Fatalf("高负载节点CPU使用率应高于90%%，实际为%.2f%%", nodeData.CPU.Utilization)
+	}
+	if nodeData.Memory.Utilization < 85 {
+		t.Fatalf("高负载节点内存使用率应高于85%%，实际为%.2f%%", nodeData.Memory.Utilization)
+	}
+
 	// 分析节点
 	result, err := analyzer.AnalyzeNode(nodeData)
 	if err != nil {
@@ -261,11 +281,18 @@ func TestHighLoadNodeInspection(t *testing.T) {
 	// 计算未通过的项目数量
 	failedItems := 0
 	hasCPUUtilizationWarning := false
+	hasMemoryUtilizationWarning := false
+	
 	for _, item := range result.Items {
 		if !item.Passed {
 			failedItems++
+			t.Logf("未通过: %s - %s (值: %s, 阈值: %s)", item.Name, item.Description, item.Value, item.Threshold)
+			
 			if item.Metric == "cpu_utilization" {
 				hasCPUUtilizationWarning = true
+			}
+			if item.Metric == "memory_utilization" {
+				hasMemoryUtilizationWarning = true
 			}
 		}
 	}
@@ -278,6 +305,11 @@ func TestHighLoadNodeInspection(t *testing.T) {
 	// 检查是否包含CPU使用率过高的警告
 	if !hasCPUUtilizationWarning {
 		t.Errorf("应该检测到CPU使用率过高")
+	}
+	
+	// 检查是否包含内存使用率过高的警告
+	if !hasMemoryUtilizationWarning {
+		t.Errorf("应该检测到内存使用率过高")
 	}
 }
 

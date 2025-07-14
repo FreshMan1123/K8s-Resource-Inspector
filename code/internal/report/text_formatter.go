@@ -26,6 +26,9 @@ func (f *TextFormatter) Format(report *Report) string {
 	// 添加报告头部
 	f.writeHeader(&sb, report)
 	
+	// 添加节点详细信息部分
+	f.writeNodeDetails(&sb, report)
+	
 	// 添加摘要部分
 	f.writeSummary(&sb, report)
 	
@@ -52,6 +55,36 @@ func (f *TextFormatter) writeHeader(sb *strings.Builder, report *Report) {
 	}
 	
 	sb.WriteString("\n")
+}
+
+// writeNodeDetails 添加节点详细信息部分到字符串构建器
+func (f *TextFormatter) writeNodeDetails(sb *strings.Builder, report *Report) {
+	if len(report.NodeDetails) == 0 {
+		return
+	}
+	
+	sb.WriteString("NODE DETAILS\n")
+	sb.WriteString("----------------------------------------\n\n")
+	
+	for _, node := range report.NodeDetails {
+		sb.WriteString(fmt.Sprintf("Node: %s\n", node.Name))
+		sb.WriteString(fmt.Sprintf("Status: %s\n", getNodeStatusString(node.Ready)))
+		sb.WriteString(fmt.Sprintf("CPU Utilization: %.2f%%\n", node.CPUUtilization))
+		sb.WriteString(fmt.Sprintf("Memory Utilization: %.2f%%\n", node.MemoryUtilization))
+		if node.PodUtilization > 0 {
+			sb.WriteString(fmt.Sprintf("Pod Count: %d/%d (%.2f%%)\n", node.RunningPods, node.MaxPods, node.PodUtilization))
+		}
+		sb.WriteString(fmt.Sprintf("Health Score: %d/100\n", node.HealthScore))
+		sb.WriteString("\n")
+	}
+}
+
+// getNodeStatusString 根据节点就绪状态返回状态字符串
+func getNodeStatusString(ready bool) string {
+	if ready {
+		return "Ready"
+	}
+	return "NotReady"
 }
 
 // writeSummary 添加摘要部分到字符串构建器
