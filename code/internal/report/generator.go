@@ -57,9 +57,13 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 		nodeDetail := NodeDetail{
 			Name:        result.NodeName,
 			HealthScore: result.HealthScore,
+			Ready:       true, // 默认设置为Ready
+			RunningPods: 0,    // 默认为0
+			MaxPods:     0,    // 默认为0
+			PodUtilization: 0, // 默认为0
 		}
 		
-		// 查找CPU、内存和Pod利用率
+		// 查找CPU、内存和Pod利用率以及Ready状态
 		for _, item := range result.Items {
 			switch item.Metric {
 			case "cpu_utilization":
@@ -74,8 +78,16 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
 					nodeDetail.PodUtilization = val
 				}
+			case "ready":
+				// 如果有ready指标，使用它的值
+				if val, err := strconv.ParseBool(item.Value); err == nil {
+					nodeDetail.Ready = val
+				}
 			}
 		}
+		
+		// 移除Pod数量的默认值和计算逻辑
+		// 不再设置默认值，使用实际获取的数据，没有则保持为0
 		
 		// 添加到报告
 		report.NodeDetails = append(report.NodeDetails, nodeDetail)

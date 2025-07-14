@@ -185,8 +185,8 @@ func (c *Client) GetNode(nodeName string) (*models.Node, error) {
 		return nil, fmt.Errorf("获取节点指标失败: %w", err)
 	}
 
-	// 获取节点上的Pod列表
-	pods, err := c.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+	// 获取节点上的Pod列表（所有命名空间）
+	pods, err := c.Clientset.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("spec.nodeName=%s", nodeName),
 	})
 	if err != nil {
@@ -221,8 +221,8 @@ func (c *Client) ListNodes() (*models.NodeList, error) {
 		metricsMap[metrics.Name] = &nodeMetricsList.Items[i]
 	}
 
-	// 获取所有Pod
-	allPods, err := c.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	// 获取所有Pod（所有命名空间）
+	allPods, err := c.Clientset.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("获取Pod列表失败: %w", err)
 	}

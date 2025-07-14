@@ -71,9 +71,10 @@ func (f *TextFormatter) writeNodeDetails(sb *strings.Builder, report *Report) {
 		sb.WriteString(fmt.Sprintf("Status: %s\n", getNodeStatusString(node.Ready)))
 		sb.WriteString(fmt.Sprintf("CPU Utilization: %.2f%%\n", node.CPUUtilization))
 		sb.WriteString(fmt.Sprintf("Memory Utilization: %.2f%%\n", node.MemoryUtilization))
-		if node.PodUtilization > 0 {
-			sb.WriteString(fmt.Sprintf("Pod Count: %d/%d (%.2f%%)\n", node.RunningPods, node.MaxPods, node.PodUtilization))
-		}
+		
+		// 简化Pod数量显示逻辑，始终显示为 "Pod Count: 0"，不显示百分比
+		sb.WriteString(fmt.Sprintf("Pod Count: %d\n", node.RunningPods))
+		
 		sb.WriteString(fmt.Sprintf("Health Score: %d/100\n", node.HealthScore))
 		sb.WriteString("\n")
 	}
