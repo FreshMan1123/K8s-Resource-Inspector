@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-config
+  namespace: default
+data:
+  app.properties: |
+    # 应用配置
+    app.name=K8s资源检查器
+    app.version=1.0.0
+    app.environment=development
+  
+  database.properties: |
+    # 数据库配置
+    db.host=localhost
+    db.port=5432
+    db.name=appdb
+    db.user=admin
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: another-config
+  namespace: default
+data:
+  settings.json: |
+    {
+      "debug": true,
+      "logLevel": "info",
+      "maxConnections": 100
+    } 
