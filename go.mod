@@ -1,4 +1,4 @@
-module github.com/yourusername/k8s-resource-inspector
+module github.com/FreshMan1123/k8s-resource-inspector
 
 go 1.19
 
