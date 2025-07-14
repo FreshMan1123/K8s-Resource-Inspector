@@ -51,41 +51,38 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 	resourcesWithIssues := make(map[string]bool)
 	
 	for _, result := range results {
-		if len(result.Violations) == 0 {
-			continue
-		}
-		
-		resourcesWithIssues[result.NodeName] = true
-		
-		// 处理每个违规
-		for _, violation := range result.Violations {
-			rule, exists := rulesMap[violation.RuleID]
-			
-			severity := mapSeverity(violation.Severity)
-			report.Summary.FindingCounts[severity]++
-			
-			finding := Finding{
-				ResourceName:   result.NodeName,
-				ResourceKind:   "Node",
-				RuleID:         violation.RuleID,
-				Message:        violation.Message,
-				Severity:       severity,
-				Recommendation: violation.Recommendation,
-				Details:        make(map[string]interface{}),
+		// 查找未通过的分析项
+		for _, item := range result.Items {
+			if !item.Passed {
+				resourcesWithIssues[result.NodeName] = true
+				
+				severity := mapSeverity(item.Severity)
+				report.Summary.FindingCounts[severity]++
+				
+				finding := Finding{
+					ResourceName:   result.NodeName,
+					ResourceKind:   "Node",
+					RuleID:         item.RuleID,
+					Message:        item.Description,
+					Severity:       severity,
+					Recommendation: item.Remediation,
+					Details:        make(map[string]interface{}),
+				}
+				
+				// 添加资源指标到详情
+				finding.Details["metric_name"] = item.Metric
+				finding.Details["metric_value"] = item.Value
+				finding.Details["threshold"] = item.Threshold
+				
+				// 如果存在，添加规则信息
+				if rule, exists := rulesMap[item.RuleID]; exists {
+					finding.Details["rule_description"] = rule.Description
+					finding.Details["rule_category"] = rule.Category
+				}
+				
+				// 将发现项添加到报告
+				report.Findings = append(report.Findings, finding)
 			}
-			
-			// 添加资源指标到详情
-			finding.Details["cpu_utilization"] = result.NodeMetrics.CPUUtilization
-			finding.Details["memory_utilization"] = result.NodeMetrics.MemoryUtilization
-			
-			// 如果存在，添加规则信息
-			if exists {
-				finding.Details["rule_description"] = rule.Description
-				finding.Details["rule_category"] = rule.Category
-			}
-			
-			// 将发现项添加到报告
-			report.Findings = append(report.Findings, finding)
 		}
 	}
 	
