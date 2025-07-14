@@ -1,0 +1,1 @@
+corev1 是最基础的k8s api包，是与k8s api 交互的基础
