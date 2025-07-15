@@ -48,6 +48,17 @@ func init() {
 		&inspectOutputFile,
 	))
 	
+	// 添加Pod检查命令
+	inspectCmd.AddCommand(inspect.NewPodCommand(
+		&inspectKubeconfig, 
+		&inspectContextName,
+		&inspectOutputFormat,
+		&inspectNoColor,
+		&inspectOnlyIssues,
+		&inspectRulesFile,
+		&inspectOutputFile,
+	))
+	
 	// 添加inspect命令到根命令
 	rootCmd.AddCommand(inspectCmd)
 } 

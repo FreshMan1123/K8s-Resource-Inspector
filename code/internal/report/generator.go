@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/pod"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
 )
 
@@ -130,6 +131,70 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 	report.Summary.ResourcesWithIssues = len(resourcesWithIssues)
 	
 	return report
+}
+
+// GeneratePodReport 从Pod分析结果创建报告
+func (g *DefaultGenerator) GeneratePodReport(results []*pod.AnalysisResult, rules []rules.Rule) *Report {
+	report := &Report{
+		Timestamp:   time.Now(),
+		ClusterName: g.ClusterName,
+		Namespace:   g.Namespace,
+		Findings:    make([]Finding, 0),
+		Summary: ReportSummary{
+			FindingCounts: make(map[Severity]int),
+		},
+	}
+
+	// 添加Pod详情
+	for _, result := range results {
+		// 添加发现项
+		for _, item := range result.Items {
+			if !item.Passed {
+				severity := mapSeverity(item.Severity)
+				finding := Finding{
+					ResourceName: result.PodName,
+					ResourceKind: "Pod",
+					RuleID:       item.RuleID,
+					Message:      item.Description,
+					Severity:     severity,
+					Recommendation: item.Remediation,
+					Details: map[string]interface{}{
+						"metric":    item.Metric,
+						"value":     item.Value,
+						"threshold": item.Threshold,
+						"namespace": result.Namespace,
+					},
+				}
+
+				report.Findings = append(report.Findings, finding)
+				report.Summary.FindingCounts[severity]++
+			}
+		}
+	}
+
+	// 更新统计信息
+	report.Summary.TotalResources = len(results)
+	report.Summary.ResourcesWithIssues = countResourcesWithIssues(results)
+
+	return report
+}
+
+// countResourcesWithIssues 计算有问题的Pod数量
+func countResourcesWithIssues(results []*pod.AnalysisResult) int {
+	count := 0
+	for _, result := range results {
+		hasIssues := false
+		for _, item := range result.Items {
+			if !item.Passed {
+				hasIssues = true
+				break
+			}
+		}
+		if hasIssues {
+			count++
+		}
+	}
+	return count
 }
 
 // createNodeDetailFromAnalysisResult 从分析结果创建节点详情

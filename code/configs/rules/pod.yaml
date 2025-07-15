@@ -1,0 +1,96 @@
+apiVersion: "v1"
+kind: "RulesConfig"
+config:
+  autoReload: true
+  reloadInterval: "5m"
+  environment: "test"
+clusterEnvironments:
+  "default-cluster": "test"
+rules:
+  # 状态规则
+  - id: "pod-not-running"
+    name: "Pod非Running状态"
+    description: "Pod处于非Running状态超过一定时间"
+    category: "pod"
+    condition:
+      metric: "pod_not_running_duration"
+      operator: ">="
+      threshold: 30  # 单位：分钟
+    severity: "warning"
+    remediation: "检查Pod事件和日志，确认是否存在配置或资源问题"
+    enabled: true
+  
+  # 资源规则
+  - id: "pod-high-cpu"
+    name: "Pod CPU使用率过高"
+    description: "Pod CPU使用率超过限制的80%"
+    category: "pod"
+    condition:
+      metric: "pod_cpu_utilization"
+      operator: ">="
+      threshold: 80
+    severity: "warning"
+    remediation: "考虑增加资源限制或优化应用性能"
+    enabled: true
+  
+  - id: "pod-high-memory"
+    name: "Pod内存使用率过高"
+    description: "Pod内存使用率超过限制的80%"
+    category: "pod"
+    condition:
+      metric: "pod_memory_utilization"
+      operator: ">="
+      threshold: 80
+    severity: "warning"
+    remediation: "检查内存泄漏问题或增加内存限制"
+    enabled: true
+  
+  # 稳定性规则
+  - id: "pod-frequent-restarts"
+    name: "Pod频繁重启"
+    description: "Pod在短时间内重启次数过多"
+    category: "pod"
+    condition:
+      metric: "pod_restart_count"
+      operator: ">="
+      threshold: 5
+    severity: "critical"
+    remediation: "检查应用日志，确认是否存在应用崩溃或资源不足问题"
+    enabled: true
+  
+  - id: "container-crash"
+    name: "容器崩溃"
+    description: "容器最近发生崩溃"
+    category: "pod"
+    condition:
+      metric: "container_crash"
+      operator: "=="
+      threshold: true
+    severity: "critical"
+    remediation: "检查容器日志，确认崩溃原因"
+    enabled: true
+  
+  # 配置规则
+  - id: "pod-missing-resource-limits"
+    name: "Pod缺少资源限制"
+    description: "Pod容器未设置资源限制"
+    category: "pod"
+    condition:
+      metric: "pod_missing_resource_limits"
+      operator: "=="
+      threshold: true
+    severity: "warning"
+    remediation: "为Pod设置适当的资源请求和限制"
+    enabled: true
+  
+  - id: "pod-missing-probes"
+    name: "Pod缺少健康检查"
+    description: "Pod未配置就绪探针或存活探针"
+    category: "pod"
+    condition:
+      metric: "pod_missing_probes"
+      operator: "=="
+      threshold: true
+    severity: "info"
+    remediation: "配置适当的就绪探针和存活探针以提高可靠性"
+    enabled: true 
