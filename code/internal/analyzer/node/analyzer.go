@@ -49,11 +49,74 @@ type AnalysisResult struct {
 		Ready bool `json:"ready"`
 		// 运行中的Pod数量
 		RunningPods int `json:"running_pods"`
+		// 总Pod数量
+		TotalPods int `json:"total_pods"`
 		// 最大Pod数量
 		MaxPods int `json:"max_pods"`
 		// Pod利用率
 		PodUtilization float64 `json:"pod_utilization"`
 	} `json:"node_basic_info"`
+	
+	// 节点详细信息
+	NodeInfo struct {
+		// 内核版本
+		KernelVersion string `json:"kernel_version"`
+		// 操作系统
+		OSImage string `json:"os_image"`
+		// 容器运行时版本
+		ContainerRuntimeVersion string `json:"container_runtime_version"`
+		// Kubelet版本
+		KubeletVersion string `json:"kubelet_version"`
+		// Kube-Proxy版本
+		KubeProxyVersion string `json:"kube_proxy_version"`
+		// 架构
+		Architecture string `json:"architecture"`
+	} `json:"node_info"`
+	
+	// 节点资源详细信息
+	Resources struct {
+		// CPU资源
+		CPU struct {
+			// 资源总量
+			Capacity string `json:"capacity"`
+			// 可分配资源总量
+			Allocatable string `json:"allocatable"`
+			// 已分配给Pod的资源量
+			Allocated string `json:"allocated"`
+			// 实际使用的资源量
+			Used string `json:"used"`
+		} `json:"cpu"`
+		
+		// 内存资源
+		Memory struct {
+			// 资源总量
+			Capacity string `json:"capacity"`
+			// 可分配资源总量
+			Allocatable string `json:"allocatable"`
+			// 已分配给Pod的资源量
+			Allocated string `json:"allocated"`
+			// 实际使用的资源量
+			Used string `json:"used"`
+		} `json:"memory"`
+		
+		// 临时存储资源
+		EphemeralStorage struct {
+			// 资源总量
+			Capacity string `json:"capacity"`
+			// 可分配资源总量
+			Allocatable string `json:"allocatable"`
+			// 已分配给Pod的资源量
+			Allocated string `json:"allocated"`
+			// 实际使用的资源量
+			Used string `json:"used"`
+		} `json:"ephemeral_storage"`
+	} `json:"resources"`
+	
+	// 节点角色、创建时间等信息
+	Roles []string `json:"roles"`
+	CreationTime time.Time `json:"creation_time"`
+	Schedulable bool `json:"schedulable"`
+	Addresses map[string]string `json:"addresses"`
 }
 
 // NodeAnalyzer 节点资源分析器
@@ -98,8 +161,39 @@ func (na *NodeAnalyzer) AnalyzeNode(node *models.Node) (*AnalysisResult, error) 
 	// 填充节点基本信息
 	result.NodeBasicInfo.Ready = node.Ready
 	result.NodeBasicInfo.RunningPods = node.RunningPods
+	result.NodeBasicInfo.TotalPods = node.TotalPods
 	result.NodeBasicInfo.MaxPods = int(node.Pods.Allocatable.Value())
 	result.NodeBasicInfo.PodUtilization = node.Pods.Utilization
+	
+	// 填充节点详细信息
+	result.NodeInfo.KernelVersion = node.NodeInfo.KernelVersion
+	result.NodeInfo.OSImage = node.NodeInfo.OSImage
+	result.NodeInfo.ContainerRuntimeVersion = node.NodeInfo.ContainerRuntimeVersion
+	result.NodeInfo.KubeletVersion = node.NodeInfo.KubeletVersion
+	result.NodeInfo.KubeProxyVersion = node.NodeInfo.KubeProxyVersion
+	result.NodeInfo.Architecture = node.NodeInfo.Architecture
+	
+	// 填充资源详细信息
+	result.Resources.CPU.Capacity = node.CPU.Capacity.String()
+	result.Resources.CPU.Allocatable = node.CPU.Allocatable.String()
+	result.Resources.CPU.Allocated = node.CPU.Allocated.String()
+	result.Resources.CPU.Used = node.CPU.Used.String()
+	
+	result.Resources.Memory.Capacity = node.Memory.Capacity.String()
+	result.Resources.Memory.Allocatable = node.Memory.Allocatable.String()
+	result.Resources.Memory.Allocated = node.Memory.Allocated.String()
+	result.Resources.Memory.Used = node.Memory.Used.String()
+	
+	result.Resources.EphemeralStorage.Capacity = node.EphemeralStorage.Capacity.String()
+	result.Resources.EphemeralStorage.Allocatable = node.EphemeralStorage.Allocatable.String()
+	result.Resources.EphemeralStorage.Allocated = node.EphemeralStorage.Allocated.String()
+	result.Resources.EphemeralStorage.Used = node.EphemeralStorage.Used.String()
+	
+	// 填充其他节点信息
+	result.Roles = node.Roles
+	result.CreationTime = node.CreationTime
+	result.Schedulable = node.Schedulable
+	result.Addresses = node.Addresses
 
 	// 分析CPU资源指标
 	cpuItems := na.analyzeResourceMetric(node.Name, "cpu", node.CPU)

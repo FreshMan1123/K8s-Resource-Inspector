@@ -64,14 +64,23 @@ func (nc *NodeCollector) GetNodes(ctx context.Context) (*models.NodeList, error)
 	
 	// 计算每个节点上已分配的资源
 	nodeAllocatedResources := make(map[string]map[corev1.ResourceName]resource.Quantity)
+	// 计算每个节点上的Pod数量
+	nodeTotalPods := make(map[string]int)
+	
 	for _, pod := range pods.Items {
-		// 忽略已完成的Pod
-		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		nodeName := pod.Spec.NodeName
+		if nodeName == "" {
 			continue
 		}
 		
-		nodeName := pod.Spec.NodeName
-		if nodeName == "" {
+		// 统计每个节点上的总Pod数量
+		if _, exists := nodeTotalPods[nodeName]; !exists {
+			nodeTotalPods[nodeName] = 0
+		}
+		nodeTotalPods[nodeName]++
+		
+		// 忽略已完成的Pod进行资源计算
+		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 			continue
 		}
 		
@@ -118,6 +127,8 @@ func (nc *NodeCollector) GetNodes(ctx context.Context) (*models.NodeList, error)
 	
 	for _, node := range nodes.Items {
 		modelNode := convertNodeToModel(&node, metricsMap[node.Name], nodeAllocatedResources[node.Name])
+		// 设置总Pod数量
+		modelNode.TotalPods = nodeTotalPods[node.Name]
 		nodeList.Items = append(nodeList.Items, modelNode)
 		
 		// 更新统计信息
@@ -163,6 +174,7 @@ func (nc *NodeCollector) GetNode(ctx context.Context, name string) (*models.Node
 	allocatedResources["pods"] = resource.Quantity{}
 	
 	runningPods := 0
+	totalPods := len(pods.Items) // 总Pod数量
 	for _, pod := range pods.Items {
 		// 忽略已完成的Pod
 		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
@@ -198,6 +210,7 @@ func (nc *NodeCollector) GetNode(ctx context.Context, name string) (*models.Node
 	
 	// 转换为内部节点模型
 	modelNode := convertNodeToModel(node, nodeMetric.Usage, allocatedResources)
+	modelNode.TotalPods = totalPods // 设置总Pod数量
 	return &modelNode, nil
 }
 

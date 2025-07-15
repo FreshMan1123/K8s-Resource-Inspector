@@ -419,6 +419,7 @@ func buildNodeModel(node *v1.Node, metrics *metricsv1beta1.NodeMetrics, pods *v1
 			AllocationRate: podAllocationRate,
 		},
 		RunningPods: countRunningPods(pods),
+		TotalPods:   len(pods.Items), // 设置总Pod数量
 		Conditions:  conditions,
 	}
 	

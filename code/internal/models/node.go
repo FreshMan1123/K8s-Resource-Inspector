@@ -117,6 +117,8 @@ type Node struct {
 	
 	// 节点上运行的Pod数量
 	RunningPods int
+	// 节点上的总Pod数量（包括运行中和已完成的）
+	TotalPods int
 	// 节点条件状态列表
 	Conditions []NodeConditionStatus
 	

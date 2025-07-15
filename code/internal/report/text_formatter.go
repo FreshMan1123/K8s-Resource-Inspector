@@ -67,15 +67,110 @@ func (f *TextFormatter) writeNodeDetails(sb *strings.Builder, report *Report) {
 	sb.WriteString("----------------------------------------\n\n")
 	
 	for _, node := range report.NodeDetails {
-		sb.WriteString(fmt.Sprintf("Node: %s\n", node.Name))
-		sb.WriteString(fmt.Sprintf("Status: %s\n", getNodeStatusString(node.Ready)))
-		sb.WriteString(fmt.Sprintf("CPU Utilization: %.2f%%\n", node.CPUUtilization))
-		sb.WriteString(fmt.Sprintf("Memory Utilization: %.2f%%\n", node.MemoryUtilization))
+		// 基本信息
+		sb.WriteString(fmt.Sprintf("节点: %s\n", node.Name))
 		
-		// 简化Pod数量显示逻辑，始终显示为 "Pod Count: 0"，不显示百分比
-		sb.WriteString(fmt.Sprintf("Pod Count: %d\n", node.RunningPods))
+		// 角色信息
+		if len(node.Roles) > 0 {
+			sb.WriteString(fmt.Sprintf("角色: %s\n", strings.Join(node.Roles, ", ")))
+		} else {
+			sb.WriteString("角色: 未知\n")
+		}
 		
-		sb.WriteString(fmt.Sprintf("Health Score: %d/100\n", node.HealthScore))
+		// 状态信息
+		sb.WriteString(fmt.Sprintf("状态: %s\n", getNodeStatusString(node.Ready)))
+		sb.WriteString(fmt.Sprintf("可调度: %v\n", node.Schedulable))
+		
+		// 地址信息
+		if len(node.Addresses) > 0 {
+			sb.WriteString("地址:\n")
+			for addrType, addr := range node.Addresses {
+				sb.WriteString(fmt.Sprintf("  %s: %s\n", addrType, addr))
+			}
+		}
+		
+		// 创建时间
+		if !node.CreationTime.IsZero() {
+			sb.WriteString(fmt.Sprintf("创建时间: %s\n", node.CreationTime.Format(time.RFC3339)))
+		}
+		
+		// 节点信息
+		sb.WriteString("节点信息:\n")
+		sb.WriteString(fmt.Sprintf("  内核版本: %s\n", getValueOrDefault(node.NodeInfo.KernelVersion, "未知")))
+		sb.WriteString(fmt.Sprintf("  操作系统: %s\n", getValueOrDefault(node.NodeInfo.OSImage, "未知")))
+		sb.WriteString(fmt.Sprintf("  容器运行时: %s\n", getValueOrDefault(node.NodeInfo.ContainerRuntimeVersion, "未知")))
+		sb.WriteString(fmt.Sprintf("  Kubelet版本: %s\n", getValueOrDefault(node.NodeInfo.KubeletVersion, "未知")))
+		sb.WriteString(fmt.Sprintf("  Kube-Proxy版本: %s\n", getValueOrDefault(node.NodeInfo.KubeProxyVersion, "未知")))
+		sb.WriteString(fmt.Sprintf("  架构: %s\n", getValueOrDefault(node.NodeInfo.Architecture, "未知")))
+		
+		// 资源信息
+		sb.WriteString("资源使用情况:\n")
+		
+		// CPU资源
+		sb.WriteString("  CPU:\n")
+		if node.CPU.Capacity != "" {
+			sb.WriteString(fmt.Sprintf("    总量: %s\n", node.CPU.Capacity))
+		}
+		if node.CPU.Allocatable != "" {
+			sb.WriteString(fmt.Sprintf("    可分配: %s\n", node.CPU.Allocatable))
+		}
+		if node.CPU.Allocated != "" {
+			sb.WriteString(fmt.Sprintf("    已分配: %s\n", node.CPU.Allocated))
+		}
+		if node.CPU.Used != "" {
+			sb.WriteString(fmt.Sprintf("    已使用: %s\n", node.CPU.Used))
+		}
+		sb.WriteString(fmt.Sprintf("    利用率: %.2f%%\n", node.CPU.Utilization))
+		sb.WriteString(fmt.Sprintf("    分配率: %.2f%%\n", node.CPU.AllocationRate))
+		
+		// 内存资源
+		sb.WriteString("  内存:\n")
+		if node.Memory.Capacity != "" {
+			sb.WriteString(fmt.Sprintf("    总量: %s\n", node.Memory.Capacity))
+		}
+		if node.Memory.Allocatable != "" {
+			sb.WriteString(fmt.Sprintf("    可分配: %s\n", node.Memory.Allocatable))
+		}
+		if node.Memory.Allocated != "" {
+			sb.WriteString(fmt.Sprintf("    已分配: %s\n", node.Memory.Allocated))
+		}
+		if node.Memory.Used != "" {
+			sb.WriteString(fmt.Sprintf("    已使用: %s\n", node.Memory.Used))
+		}
+		sb.WriteString(fmt.Sprintf("    利用率: %.2f%%\n", node.Memory.Utilization))
+		sb.WriteString(fmt.Sprintf("    分配率: %.2f%%\n", node.Memory.AllocationRate))
+		
+		// 临时存储资源
+		sb.WriteString("  临时存储:\n")
+		if node.EphemeralStorage.Capacity != "" {
+			sb.WriteString(fmt.Sprintf("    总量: %s\n", node.EphemeralStorage.Capacity))
+		}
+		if node.EphemeralStorage.Allocatable != "" {
+			sb.WriteString(fmt.Sprintf("    可分配: %s\n", node.EphemeralStorage.Allocatable))
+		}
+		if node.EphemeralStorage.Allocated != "" {
+			sb.WriteString(fmt.Sprintf("    已分配: %s\n", node.EphemeralStorage.Allocated))
+		}
+		if node.EphemeralStorage.Used != "" {
+			sb.WriteString(fmt.Sprintf("    已使用: %s\n", node.EphemeralStorage.Used))
+		}
+		sb.WriteString(fmt.Sprintf("    利用率: %.2f%%\n", node.EphemeralStorage.Utilization))
+		sb.WriteString(fmt.Sprintf("    分配率: %.2f%%\n", node.EphemeralStorage.AllocationRate))
+		
+		// Pod信息
+		sb.WriteString(fmt.Sprintf("Pod数量: %d/%d (%.2f%%)\n", node.RunningPods, node.TotalPods, 
+			calculatePodPercentage(node.RunningPods, node.TotalPods)))
+		
+		// 压力状态
+		sb.WriteString("压力状态:\n")
+		sb.WriteString(fmt.Sprintf("  内存压力: %v\n", node.PressureStatus.MemoryPressure))
+		sb.WriteString(fmt.Sprintf("  CPU压力: %v\n", node.PressureStatus.CPUPressure))
+		sb.WriteString(fmt.Sprintf("  磁盘压力: %v\n", node.PressureStatus.DiskPressure))
+		sb.WriteString(fmt.Sprintf("  网络压力: %v\n", node.PressureStatus.NetworkPressure))
+		sb.WriteString(fmt.Sprintf("  PID压力: %v\n", node.PressureStatus.PIDPressure))
+		
+		// 健康评分
+		sb.WriteString(fmt.Sprintf("健康评分: %d/100\n", node.HealthScore))
 		sb.WriteString("\n")
 	}
 }
@@ -86,6 +181,22 @@ func getNodeStatusString(ready bool) string {
 		return "Ready"
 	}
 	return "NotReady"
+}
+
+// getValueOrDefault 获取值或默认值
+func getValueOrDefault(value string, defaultValue string) string {
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
+// calculatePodPercentage 计算Pod百分比
+func calculatePodPercentage(running, total int) float64 {
+	if total == 0 {
+		return 0
+	}
+	return float64(running) / float64(total) * 100
 }
 
 // writeSummary 添加摘要部分到字符串构建器

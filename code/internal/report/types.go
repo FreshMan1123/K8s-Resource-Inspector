@@ -24,14 +24,103 @@ type NodeDetail struct {
 	Name string `json:"name"`
 	// 节点就绪状态
 	Ready bool `json:"ready"`
-	// CPU利用率
+	// 节点是否可调度
+	Schedulable bool `json:"schedulable"`
+	// 节点角色（master/worker）
+	Roles []string `json:"roles"`
+	// 节点IP地址
+	Addresses map[string]string `json:"addresses"`
+	// 节点创建时间
+	CreationTime time.Time `json:"creationTime"`
+	
+	// 节点信息
+	NodeInfo struct {
+		// 内核版本
+		KernelVersion string `json:"kernelVersion"`
+		// 操作系统
+		OSImage string `json:"osImage"`
+		// 容器运行时版本
+		ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
+		// Kubelet版本
+		KubeletVersion string `json:"kubeletVersion"`
+		// Kube-Proxy版本
+		KubeProxyVersion string `json:"kubeProxyVersion"`
+		// 架构
+		Architecture string `json:"architecture"`
+	} `json:"nodeInfo"`
+	
+	// 节点压力状态
+	PressureStatus struct {
+		// CPU压力状态
+		CPUPressure bool `json:"cpuPressure"`
+		// 内存压力状态
+		MemoryPressure bool `json:"memoryPressure"`
+		// 磁盘压力状态
+		DiskPressure bool `json:"diskPressure"`
+		// 网络压力状态
+		NetworkPressure bool `json:"networkPressure"`
+		// PID压力状态
+		PIDPressure bool `json:"pidPressure"`
+	} `json:"pressureStatus"`
+	
+	// CPU资源指标
+	CPU struct {
+		// 资源总量
+		Capacity string `json:"capacity"`
+		// 可分配资源总量
+		Allocatable string `json:"allocatable"`
+		// 已分配给Pod的资源量
+		Allocated string `json:"allocated"`
+		// 实际使用的资源量
+		Used string `json:"used"`
+		// 资源利用率
+		Utilization float64 `json:"utilization"`
+		// 资源分配率
+		AllocationRate float64 `json:"allocationRate"`
+	} `json:"cpu"`
+	
+	// 内存资源指标
+	Memory struct {
+		// 资源总量
+		Capacity string `json:"capacity"`
+		// 可分配资源总量
+		Allocatable string `json:"allocatable"`
+		// 已分配给Pod的资源量
+		Allocated string `json:"allocated"`
+		// 实际使用的资源量
+		Used string `json:"used"`
+		// 资源利用率
+		Utilization float64 `json:"utilization"`
+		// 资源分配率
+		AllocationRate float64 `json:"allocationRate"`
+	} `json:"memory"`
+	
+	// 临时存储资源指标
+	EphemeralStorage struct {
+		// 资源总量
+		Capacity string `json:"capacity"`
+		// 可分配资源总量
+		Allocatable string `json:"allocatable"`
+		// 已分配给Pod的资源量
+		Allocated string `json:"allocated"`
+		// 实际使用的资源量
+		Used string `json:"used"`
+		// 资源利用率
+		Utilization float64 `json:"utilization"`
+		// 资源分配率
+		AllocationRate float64 `json:"allocationRate"`
+	} `json:"ephemeralStorage"`
+	
+	// CPU利用率 (保留向后兼容)
 	CPUUtilization float64 `json:"cpuUtilization"`
-	// 内存利用率
+	// 内存利用率 (保留向后兼容)
 	MemoryUtilization float64 `json:"memoryUtilization"`
 	// 运行中的Pod数量
 	RunningPods int `json:"runningPods"`
 	// 最大Pod数量
 	MaxPods int `json:"maxPods"`
+	// 总Pod数量（包括运行中和已完成的）
+	TotalPods int `json:"totalPods"`
 	// Pod利用率
 	PodUtilization float64 `json:"podUtilization"`
 	// 健康评分

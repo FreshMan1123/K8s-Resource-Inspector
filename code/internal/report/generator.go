@@ -53,15 +53,8 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 	resourcesWithIssues := make(map[string]bool)
 	
 	for _, result := range results {
-		// 添加节点详情
-		nodeDetail := NodeDetail{
-			Name:        result.NodeName,
-			HealthScore: result.HealthScore,
-			Ready:       result.NodeBasicInfo.Ready,
-			RunningPods: result.NodeBasicInfo.RunningPods,
-			MaxPods:     result.NodeBasicInfo.MaxPods,
-			PodUtilization: result.NodeBasicInfo.PodUtilization,
-		}
+		// 从分析结果中获取节点详情
+		nodeDetail := g.createNodeDetailFromAnalysisResult(&result)
 		
 		// 查找CPU、内存和Pod利用率以及Ready状态
 		for _, item := range result.Items {
@@ -69,10 +62,28 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 			case "cpu_utilization":
 				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
 					nodeDetail.CPUUtilization = val
+					nodeDetail.CPU.Utilization = val
 				}
 			case "memory_utilization":
 				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
 					nodeDetail.MemoryUtilization = val
+					nodeDetail.Memory.Utilization = val
+				}
+			case "cpu_allocation_rate":
+				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
+					nodeDetail.CPU.AllocationRate = val
+				}
+			case "memory_allocation_rate":
+				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
+					nodeDetail.Memory.AllocationRate = val
+				}
+			case "ephemeral_storage_utilization":
+				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
+					nodeDetail.EphemeralStorage.Utilization = val
+				}
+			case "ephemeral_storage_allocation_rate":
+				if val, err := strconv.ParseFloat(item.Value, 64); err == nil {
+					nodeDetail.EphemeralStorage.AllocationRate = val
 				}
 			}
 		}
@@ -119,6 +130,77 @@ func (g *DefaultGenerator) GenerateNodeReport(results []node.AnalysisResult, rul
 	report.Summary.ResourcesWithIssues = len(resourcesWithIssues)
 	
 	return report
+}
+
+// createNodeDetailFromAnalysisResult 从分析结果创建节点详情
+func (g *DefaultGenerator) createNodeDetailFromAnalysisResult(result *node.AnalysisResult) NodeDetail {
+	// 创建节点详情
+	nodeDetail := NodeDetail{
+		Name:            result.NodeName,
+		HealthScore:     result.HealthScore,
+		Ready:           result.NodeBasicInfo.Ready,
+		RunningPods:     result.NodeBasicInfo.RunningPods,
+		TotalPods:       result.NodeBasicInfo.TotalPods,
+		MaxPods:         result.NodeBasicInfo.MaxPods,
+		PodUtilization:  result.NodeBasicInfo.PodUtilization,
+		CreationTime:    result.CreationTime,
+		Schedulable:     result.Schedulable,
+		Roles:           result.Roles,
+		Addresses:       result.Addresses,
+	}
+
+	// 填充节点信息
+	nodeDetail.NodeInfo.KernelVersion = result.NodeInfo.KernelVersion
+	nodeDetail.NodeInfo.OSImage = result.NodeInfo.OSImage
+	nodeDetail.NodeInfo.ContainerRuntimeVersion = result.NodeInfo.ContainerRuntimeVersion
+	nodeDetail.NodeInfo.KubeletVersion = result.NodeInfo.KubeletVersion
+	nodeDetail.NodeInfo.KubeProxyVersion = result.NodeInfo.KubeProxyVersion
+	nodeDetail.NodeInfo.Architecture = result.NodeInfo.Architecture
+	
+	// 填充资源信息
+	nodeDetail.CPU.Capacity = result.Resources.CPU.Capacity
+	nodeDetail.CPU.Allocatable = result.Resources.CPU.Allocatable
+	nodeDetail.CPU.Allocated = result.Resources.CPU.Allocated
+	nodeDetail.CPU.Used = result.Resources.CPU.Used
+	
+	nodeDetail.Memory.Capacity = result.Resources.Memory.Capacity
+	nodeDetail.Memory.Allocatable = result.Resources.Memory.Allocatable
+	nodeDetail.Memory.Allocated = result.Resources.Memory.Allocated
+	nodeDetail.Memory.Used = result.Resources.Memory.Used
+	
+	nodeDetail.EphemeralStorage.Capacity = result.Resources.EphemeralStorage.Capacity
+	nodeDetail.EphemeralStorage.Allocatable = result.Resources.EphemeralStorage.Allocatable
+	nodeDetail.EphemeralStorage.Allocated = result.Resources.EphemeralStorage.Allocated
+	nodeDetail.EphemeralStorage.Used = result.Resources.EphemeralStorage.Used
+
+	// 查找节点信息项
+	for _, item := range result.Items {
+		// 检查节点压力状态
+		switch item.Metric {
+		case "memory_pressure":
+			if val, err := strconv.ParseBool(item.Value); err == nil {
+				nodeDetail.PressureStatus.MemoryPressure = val
+			}
+		case "cpu_pressure":
+			if val, err := strconv.ParseBool(item.Value); err == nil {
+				nodeDetail.PressureStatus.CPUPressure = val
+			}
+		case "disk_pressure":
+			if val, err := strconv.ParseBool(item.Value); err == nil {
+				nodeDetail.PressureStatus.DiskPressure = val
+			}
+		case "pid_pressure":
+			if val, err := strconv.ParseBool(item.Value); err == nil {
+				nodeDetail.PressureStatus.PIDPressure = val
+			}
+		case "network_pressure":
+			if val, err := strconv.ParseBool(item.Value); err == nil {
+				nodeDetail.PressureStatus.NetworkPressure = val
+			}
+		}
+	}
+
+	return nodeDetail
 }
 
 // mapSeverity 将分析器严重性转换为报告严重性
