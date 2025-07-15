@@ -43,6 +43,17 @@ type AnalysisResult struct {
 	HealthScore int `json:"health_score"`
 	// 分析时间
 	AnalyzedAt time.Time `json:"analyzed_at"`
+	// 节点基本信息
+	NodeBasicInfo struct {
+		// 节点就绪状态
+		Ready bool `json:"ready"`
+		// 运行中的Pod数量
+		RunningPods int `json:"running_pods"`
+		// 最大Pod数量
+		MaxPods int `json:"max_pods"`
+		// Pod利用率
+		PodUtilization float64 `json:"pod_utilization"`
+	} `json:"node_basic_info"`
 }
 
 // NodeAnalyzer 节点资源分析器
@@ -83,6 +94,12 @@ func (na *NodeAnalyzer) AnalyzeNode(node *models.Node) (*AnalysisResult, error) 
 		Items:      make([]AnalysisItem, 0),
 		AnalyzedAt: time.Now(),
 	}
+	
+	// 填充节点基本信息
+	result.NodeBasicInfo.Ready = node.Ready
+	result.NodeBasicInfo.RunningPods = node.RunningPods
+	result.NodeBasicInfo.MaxPods = int(node.Pods.Allocatable.Value())
+	result.NodeBasicInfo.PodUtilization = node.Pods.Utilization
 
 	// 分析CPU资源指标
 	cpuItems := na.analyzeResourceMetric(node.Name, "cpu", node.CPU)
