@@ -1,0 +1,67 @@
+{
+  "name": "test-pod-normal",
+  "namespace": "default",
+  "phase": "Running",
+  "ip": "10.0.0.1",
+  "nodeName": "test-node",
+  "qosClass": "Burstable",
+  "containers": [
+    {
+      "name": "container-1",
+      "image": "nginx:latest",
+      "ready": true,
+      "restartCount": 0,
+      "resources": {
+        "requests": {
+          "cpu": "100m",
+          "memory": "256Mi"
+        },
+        "limits": {
+          "cpu": "200m",
+          "memory": "512Mi"
+        }
+      },
+      "metrics": {
+        "cpuUsage": "50m",
+        "memoryUsage": "128Mi"
+      },
+      "hasProbes": true
+    },
+    {
+      "name": "container-2",
+      "image": "redis:latest",
+      "ready": true,
+      "restartCount": 0,
+      "resources": {
+        "requests": {
+          "cpu": "200m",
+          "memory": "512Mi"
+        },
+        "limits": {
+          "cpu": "400m",
+          "memory": "1Gi"
+        }
+      },
+      "metrics": {
+        "cpuUsage": "150m",
+        "memoryUsage": "384Mi"
+      },
+      "hasProbes": true
+    }
+  ],
+  "events": [
+    {
+      "type": "Normal",
+      "reason": "Started",
+      "message": "Pod已启动",
+      "count": 1
+    },
+    {
+      "type": "Normal",
+      "reason": "Pulled",
+      "message": "容器镜像已拉取",
+      "count": 1
+    }
+  ],
+  "creationTime": "2023-06-01T10:00:00Z"
+} 

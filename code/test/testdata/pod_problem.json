@@ -1,0 +1,73 @@
+{
+  "name": "test-pod-problem",
+  "namespace": "default",
+  "phase": "Running",
+  "ip": "10.0.0.2",
+  "nodeName": "test-node",
+  "qosClass": "Burstable",
+  "containers": [
+    {
+      "name": "container-1",
+      "image": "nginx:latest",
+      "ready": false,
+      "restartCount": 3,
+      "resources": {
+        "requests": {
+          "cpu": "100m",
+          "memory": "256Mi"
+        },
+        "limits": {
+          "cpu": "200m",
+          "memory": "512Mi"
+        }
+      },
+      "metrics": {
+        "cpuUsage": "190m",
+        "memoryUsage": "490Mi"
+      },
+      "hasProbes": false
+    },
+    {
+      "name": "container-2",
+      "image": "redis:latest",
+      "ready": true,
+      "restartCount": 1,
+      "resources": {
+        "requests": {
+          "cpu": "200m",
+          "memory": "512Mi"
+        },
+        "limits": {
+          "cpu": "400m",
+          "memory": "1Gi"
+        }
+      },
+      "metrics": {
+        "cpuUsage": "380m",
+        "memoryUsage": "950Mi"
+      },
+      "hasProbes": true
+    }
+  ],
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "Unhealthy",
+      "message": "容器健康检查失败",
+      "count": 3
+    },
+    {
+      "type": "Warning",
+      "reason": "BackOff",
+      "message": "容器重启失败，正在退避",
+      "count": 2
+    },
+    {
+      "type": "Normal",
+      "reason": "Started",
+      "message": "Pod已启动",
+      "count": 1
+    }
+  ],
+  "creationTime": "2023-06-01T10:00:00Z"
+} 

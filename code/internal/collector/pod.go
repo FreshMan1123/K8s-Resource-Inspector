@@ -303,7 +303,6 @@ func convertContainers(pod *corev1.Pod, containerStatuses []corev1.ContainerStat
 			Name:         status.Name,
 			Image:        status.Image,
 			State:        status.State,
-			LastState:    status.LastState,
 			Ready:        status.Ready,
 			RestartCount: int(status.RestartCount),
 		}

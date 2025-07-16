@@ -11,6 +11,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// RulesEngine 规则引擎接口
+type RulesEngine interface {
+	// GetRules 获取规则
+	GetRules(filter rules.RuleFilter) []rules.Rule
+	// EvaluateRule 评估单个规则
+	EvaluateRule(rule rules.Rule, metricType string, actualValue interface{}) (*rules.RuleResult, error)
+	// SetEnvironment 设置当前环境
+	SetEnvironment(env string)
+	// GetEnvironment 获取当前环境
+	GetEnvironment() string
+	// DetermineEnvironment 根据集群名称确定环境
+	DetermineEnvironment(clusterName string) string
+	// RegisterValidator 注册验证器
+	RegisterValidator(name string, validator rules.Validator)
+}
+
 // AnalysisItem 单个分析项目
 type AnalysisItem struct {
 	// 规则ID
@@ -121,19 +137,19 @@ type AnalysisResult struct {
 
 // PodAnalyzer Pod资源分析器
 type PodAnalyzer struct {
-	rulesEngine *rules.Engine
+	rulesEngine RulesEngine
 	client      *cluster.Client
 }
 
 // NewPodAnalyzer 创建Pod分析器
-func NewPodAnalyzer(rulesEngine *rules.Engine) *PodAnalyzer {
+func NewPodAnalyzer(rulesEngine RulesEngine) *PodAnalyzer {
 	return &PodAnalyzer{
 		rulesEngine: rulesEngine,
 	}
 }
 
 // NewPodAnalyzerWithClient 创建带有集群客户端的Pod分析器
-func NewPodAnalyzerWithClient(rulesEngine *rules.Engine, client *cluster.Client) *PodAnalyzer {
+func NewPodAnalyzerWithClient(rulesEngine RulesEngine, client *cluster.Client) *PodAnalyzer {
 	return &PodAnalyzer{
 		rulesEngine: rulesEngine,
 		client:      client,
@@ -515,46 +531,6 @@ func (pa *PodAnalyzer) analyzePodStability(pod *models.Pod) []AnalysisItem {
 			}
 			
 			items = append(items, item)
-		}
-	}
-	
-	// 检查容器崩溃
-	for _, container := range pod.Containers {
-		if container.LastState.Terminated != nil && container.LastState.Terminated.ExitCode != 0 {
-			for _, rule := range allRules {
-				if rule.Condition.Metric == "container_crash" {
-					// 评估规则
-					ruleResult, err := pa.rulesEngine.EvaluateRule(rule, "boolean", true)
-					if err != nil {
-						// 记录错误并继续
-						continue
-					}
-					
-					// 创建分析项
-					reason := container.LastState.Terminated.Reason
-					if reason == "" {
-						reason = "Unknown"
-					}
-					
-					item := AnalysisItem{
-						RuleID:      ruleResult.RuleID,
-						Name:        ruleResult.RuleName,
-						Category:    rule.Category,
-						Severity:    ruleResult.Severity,
-						Metric:      "container_crash",
-						Value:       "true",
-						Threshold:   "false",
-						Passed:      !ruleResult.Passed, // 反转结果
-						Description: fmt.Sprintf("容器 %s 最近崩溃，退出码: %d, 原因: %s", 
-							container.Name, 
-							container.LastState.Terminated.ExitCode,
-							reason),
-						Remediation: ruleResult.Remediation,
-					}
-					
-					items = append(items, item)
-				}
-			}
 		}
 	}
 

@@ -588,7 +588,7 @@ func (c *Client) GetPod(namespace, podName string) (*models.Pod, error) {
 	// 构建Pod模型
 	podModel := buildPodModel(pod, podMetricsMap, events)
 
-	return podModel, nil
+	return &podModel, nil
 }
 
 // ListPods 获取指定命名空间中的所有Pod
@@ -823,7 +823,6 @@ func buildContainers(pod *v1.Pod, containerStatuses []v1.ContainerStatus, contai
 			Name:         status.Name,
 			Image:        status.Image,
 			State:        status.State,
-			LastState:    status.LastState,
 			Ready:        status.Ready,
 			RestartCount: int(status.RestartCount),
 		}

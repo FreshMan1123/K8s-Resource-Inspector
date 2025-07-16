@@ -4,7 +4,6 @@ import (
 	"time"
 	
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Pod 表示Kubernetes Pod及其资源使用情况
@@ -61,8 +60,6 @@ type Container struct {
 	Image string
 	// 容器状态
 	State corev1.ContainerState
-	// 上次状态
-	LastState corev1.ContainerState
 	// 容器就绪状态
 	Ready bool
 	// 重启次数

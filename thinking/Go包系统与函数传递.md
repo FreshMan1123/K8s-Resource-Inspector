@@ -1,3 +1,9 @@
+go语言中，同一package下能够直接互相引用 函数
+比如说，我们alayzer/node下 有个 analyzer.go和analyzer_test.go。因为这俩是同一个package下的，所以 
+analyzer_test.go能直接analyzer := NewPodAnalyzer(mockEngine) 。引用analyzer.go地底下的函数NewPodAnalyzer 。
+
+
+
 # Go包系统与函数传递
 
 ## Go中的包系统
@@ -22,6 +28,24 @@
 - 首字母大写的标识符会被导出(公开)，可供包外访问
 - 首字母小写的标识符仅包内可见
 - 包内可以访问该包内所有标识符，无论首字母大小写
+
+### internal目录的特殊规则
+- `internal`目录是Go语言中的一个特殊目录，用于限制包的可见性
+- **导入限制**：`internal`目录下的包只能被其父目录及其子目录下的代码导入。也就是 也就是比如有 node/internal/xxxx，那么就是只有node目录底下的才能导internal，node同级的其他目录没办法导
+- **多层目录结构**：对于`a/b/c/internal/d/e`，只有`a/b/c`及其子目录下的代码可以导入`a/b/c/internal/d/e`
+- **实际应用**：在我们的项目中，`code/internal/analyzer/node`包只能被`code`目录及其子目录下的代码导入
+- **目的**：防止外部模块直接依赖内部实现细节，增强代码封装性
+
+#### 示例
+```go
+// 这是允许的导入（同一模块内部）
+// 在code/cmd/inspector/main.go中
+import "github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node"
+
+// 这是不允许的导入（外部模块）
+// 在其他项目中
+import "github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node" // 编译错误
+```
 
 ## 包的组织
 

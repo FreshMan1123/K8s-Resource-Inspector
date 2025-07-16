@@ -7,6 +7,7 @@ config:
 clusterEnvironments:
   test-cluster: "test"
 rules:
+  # 节点规则
   - id: "node-high-cpu"
     name: "节点CPU使用率过高"
     description: "节点CPU使用率过高"
@@ -29,4 +30,53 @@ rules:
       threshold: 85
     severity: "warning"
     remediation: "监控内存使用情况，必要时增加资源"
+    enabled: true
+    
+  # Pod规则
+  - id: "pod-container-cpu-high"
+    name: "容器CPU使用率过高"
+    description: "容器CPU使用率超过阈值"
+    category: "pod"
+    condition:
+      metric: "container_cpu_utilization"
+      operator: ">="
+      threshold: 90
+    severity: "warning"
+    remediation: "考虑增加容器CPU限制或优化应用程序"
+    enabled: true
+  
+  - id: "pod-container-memory-high"
+    name: "容器内存使用率过高"
+    description: "容器内存使用率超过阈值"
+    category: "pod"
+    condition:
+      metric: "container_memory_utilization"
+      operator: ">="
+      threshold: 90
+    severity: "warning"
+    remediation: "考虑增加容器内存限制或检查内存泄漏"
+    enabled: true
+  
+  - id: "pod-restart-too-many"
+    name: "Pod重启次数过多"
+    description: "Pod重启次数超过阈值"
+    category: "pod"
+    condition:
+      metric: "pod_restart_count"
+      operator: ">="
+      threshold: 3
+    severity: "critical"
+    remediation: "检查Pod日志，排查容器崩溃原因"
+    enabled: true
+  
+  - id: "pod-no-probes"
+    name: "Pod缺少健康检查"
+    description: "Pod没有配置存活探针或就绪探针"
+    category: "pod"
+    condition:
+      metric: "pod_missing_probes"
+      operator: "=="
+      threshold: true
+    severity: "info"
+    remediation: "建议为Pod配置适当的存活探针和就绪探针"
     enabled: true 
