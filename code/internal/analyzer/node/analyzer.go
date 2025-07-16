@@ -157,7 +157,7 @@ func (na *NodeAnalyzer) AnalyzeNode(node *models.Node) (*AnalysisResult, error) 
 	result.NodeBasicInfo.Ready = node.Ready
 	result.NodeBasicInfo.RunningPods = node.RunningPods
 	result.NodeBasicInfo.TotalPods = node.TotalPods
-	result.NodeBasicInfo.MaxPods = int(node.Pods.Allocatable.Value())
+	result.NodeBasicInfo.MaxPods = int(node.Pods.Allocatable)
 	result.NodeBasicInfo.PodUtilization = node.Pods.Utilization
 	
 	// 填充节点详细信息
@@ -169,20 +169,20 @@ func (na *NodeAnalyzer) AnalyzeNode(node *models.Node) (*AnalysisResult, error) 
 	result.NodeInfo.Architecture = node.NodeInfo.Architecture
 	
 	// 填充资源详细信息
-	result.Resources.CPU.Capacity = node.CPU.Capacity.String()
-	result.Resources.CPU.Allocatable = node.CPU.Allocatable.String()
-	result.Resources.CPU.Allocated = node.CPU.Allocated.String()
-	result.Resources.CPU.Used = node.CPU.Used.String()
+	result.Resources.CPU.Capacity = fmt.Sprintf("%.2f", node.CPU.Capacity)
+	result.Resources.CPU.Allocatable = fmt.Sprintf("%.2f", node.CPU.Allocatable)
+	result.Resources.CPU.Allocated = fmt.Sprintf("%.2f", node.CPU.Allocated)
+	result.Resources.CPU.Used = fmt.Sprintf("%.2f", node.CPU.Used)
 	
-	result.Resources.Memory.Capacity = node.Memory.Capacity.String()
-	result.Resources.Memory.Allocatable = node.Memory.Allocatable.String()
-	result.Resources.Memory.Allocated = node.Memory.Allocated.String()
-	result.Resources.Memory.Used = node.Memory.Used.String()
+	result.Resources.Memory.Capacity = fmt.Sprintf("%.2f", node.Memory.Capacity)
+	result.Resources.Memory.Allocatable = fmt.Sprintf("%.2f", node.Memory.Allocatable)
+	result.Resources.Memory.Allocated = fmt.Sprintf("%.2f", node.Memory.Allocated)
+	result.Resources.Memory.Used = fmt.Sprintf("%.2f", node.Memory.Used)
 	
-	result.Resources.EphemeralStorage.Capacity = node.EphemeralStorage.Capacity.String()
-	result.Resources.EphemeralStorage.Allocatable = node.EphemeralStorage.Allocatable.String()
-	result.Resources.EphemeralStorage.Allocated = node.EphemeralStorage.Allocated.String()
-	result.Resources.EphemeralStorage.Used = node.EphemeralStorage.Used.String()
+	result.Resources.EphemeralStorage.Capacity = fmt.Sprintf("%.2f", node.EphemeralStorage.Capacity)
+	result.Resources.EphemeralStorage.Allocatable = fmt.Sprintf("%.2f", node.EphemeralStorage.Allocatable)
+	result.Resources.EphemeralStorage.Allocated = fmt.Sprintf("%.2f", node.EphemeralStorage.Allocated)
+	result.Resources.EphemeralStorage.Used = fmt.Sprintf("%.2f", node.EphemeralStorage.Used)
 	
 	// 填充其他节点信息
 	result.Roles = node.Roles

@@ -1,12 +1,14 @@
 package pod
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
+
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/collector"
 	
 	corev1 "k8s.io/api/core/v1"
 )
@@ -136,9 +138,10 @@ type AnalysisResult struct {
 }
 
 // PodAnalyzer Pod资源分析器
+// 新增 collector 字段，支持依赖注入
 type PodAnalyzer struct {
 	rulesEngine RulesEngine
-	client      *cluster.Client
+	collector   *collector.PodCollector
 }
 
 // NewPodAnalyzer 创建Pod分析器
@@ -148,17 +151,17 @@ func NewPodAnalyzer(rulesEngine RulesEngine) *PodAnalyzer {
 	}
 }
 
-// NewPodAnalyzerWithClient 创建带有集群客户端的Pod分析器
-func NewPodAnalyzerWithClient(rulesEngine RulesEngine, client *cluster.Client) *PodAnalyzer {
+// NewPodAnalyzerWithCollector 创建带有 PodCollector 的 PodAnalyzer
+func NewPodAnalyzerWithCollector(rulesEngine RulesEngine, collector *collector.PodCollector) *PodAnalyzer {
 	return &PodAnalyzer{
 		rulesEngine: rulesEngine,
-		client:      client,
+		collector:   collector,
 	}
 }
 
-// SetClient 设置集群客户端
-func (pa *PodAnalyzer) SetClient(client *cluster.Client) {
-	pa.client = client
+// SetCollector 设置 PodCollector
+func (pa *PodAnalyzer) SetCollector(collector *collector.PodCollector) {
+	pa.collector = collector
 }
 
 // AnalyzePod 分析单个Pod
@@ -237,7 +240,7 @@ func (pa *PodAnalyzer) AnalyzePod(pod *models.Pod) (*AnalysisResult, error) {
 		if limit := container.Limits.Cpu(); limit != nil {
 			containerInfo.CPU.Limit = limit.String()
 		}
-		containerInfo.CPU.Used = container.CPU.Used.String()
+		containerInfo.CPU.Used = fmt.Sprintf("%.2f", container.CPU.Used)
 		containerInfo.CPU.Utilization = container.CPU.Utilization
 		
 		// 填充内存信息
@@ -247,7 +250,7 @@ func (pa *PodAnalyzer) AnalyzePod(pod *models.Pod) (*AnalysisResult, error) {
 		if limit := container.Limits.Memory(); limit != nil {
 			containerInfo.Memory.Limit = limit.String()
 		}
-		containerInfo.Memory.Used = container.Memory.Used.String()
+		containerInfo.Memory.Used = fmt.Sprintf("%.2f", container.Memory.Used)
 		containerInfo.Memory.Utilization = container.Memory.Utilization
 		
 		result.Containers = append(result.Containers, containerInfo)
@@ -301,33 +304,25 @@ func (pa *PodAnalyzer) AnalyzePod(pod *models.Pod) (*AnalysisResult, error) {
 
 // AnalyzePodByName 根据Pod名称分析Pod
 func (pa *PodAnalyzer) AnalyzePodByName(namespace, name string) (*AnalysisResult, error) {
-	if pa.client == nil {
-		return nil, fmt.Errorf("未设置集群客户端")
+	if pa.collector == nil {
+		return nil, fmt.Errorf("未设置 PodCollector")
 	}
-
-	// 获取Pod数据
-	pod, err := pa.client.GetPod(namespace, name)
+	pod, err := pa.collector.GetPod(context.TODO(), namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("获取Pod数据失败: %w", err)
 	}
-
-	// 分析Pod
 	return pa.AnalyzePod(pod)
 }
 
 // AnalyzePodsInNamespace 分析命名空间中的所有Pod
 func (pa *PodAnalyzer) AnalyzePodsInNamespace(namespace string) ([]*AnalysisResult, error) {
-	if pa.client == nil {
-		return nil, fmt.Errorf("未设置集群客户端")
+	if pa.collector == nil {
+		return nil, fmt.Errorf("未设置 PodCollector")
 	}
-
-	// 获取Pod列表
-	podList, err := pa.client.ListPods(namespace)
+	podList, err := pa.collector.GetPods(context.TODO(), namespace)
 	if err != nil {
 		return nil, fmt.Errorf("获取Pod列表失败: %w", err)
 	}
-
-	// 分析所有Pod
 	results := make([]*AnalysisResult, 0, len(podList.Items))
 	for i := range podList.Items {
 		result, err := pa.AnalyzePod(&podList.Items[i])
@@ -336,7 +331,6 @@ func (pa *PodAnalyzer) AnalyzePodsInNamespace(namespace string) ([]*AnalysisResu
 		}
 		results = append(results, result)
 	}
-
 	return results, nil
 }
 

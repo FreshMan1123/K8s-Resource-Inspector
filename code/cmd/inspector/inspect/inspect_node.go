@@ -83,7 +83,7 @@ func runNodeInspect(nodeName string) error {
 		rulesEngine, err = rules.NewEngine(*rulesFile)
 	} else {
 		// 使用默认规则文件
-		defaultRulesPath := filepath.Join("configs", "rules", "node.yaml")
+		defaultRulesPath := filepath.Join("code", "configs", "rules", "node.yaml")
 		rulesEngine, err = rules.NewEngine(defaultRulesPath)
 	}
 

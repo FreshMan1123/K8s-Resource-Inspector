@@ -130,11 +130,11 @@ func (c *MockPodClient) GetPod(key string) (*models.Pod, error) {
 			Ready:        c.Ready,
 			RestartCount: c.RestartCount,
 			CPU: models.ResourceMetric{
-				Used:        cpuUsage,
+				Used:        cpuUsage.AsApproximateFloat64(),
 				Utilization: cpuUtilization,
 			},
 			Memory: models.ResourceMetric{
-				Used:        memUsage,
+				Used:        memUsage.AsApproximateFloat64() / 1024 / 1024,
 				Utilization: memUtilization,
 			},
 			HasLivenessProbe:  c.HasProbes,
@@ -293,11 +293,11 @@ func TestPodRuleEvaluation(t *testing.T) {
 				Name:  "high-cpu-container",
 				Image: "test:latest",
 				CPU: models.ResourceMetric{
-					Used:        *resource.NewQuantity(950, resource.DecimalSI),
+					Used:        950.0,
 					Utilization: 95.0, // 95% CPU使用率，应该触发告警
 				},
 				Memory: models.ResourceMetric{
-					Used:        *resource.NewQuantity(512*1024*1024, resource.BinarySI),
+					Used:        512.0,
 					Utilization: 50.0, // 50% 内存使用率，应该正常
 				},
 				RestartCount: 0,

@@ -4,87 +4,76 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"strings"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
 	
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/metrics/pkg/client/clientset/versioned"
-	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // PodCollector Pod数据收集器
+// 只保留 cluster.Client 引用
+// 移除 metricsClient 字段
 type PodCollector struct {
 	client *cluster.Client
-	// 用于访问 Kubernetes Metrics API 的客户端，用于获取Pod指标
-	metricsClient *versioned.Clientset
 }
 
 // NewPodCollector 创建一个新的Pod收集器
 func NewPodCollector(client *cluster.Client) (*PodCollector, error) {
-	// 创建metrics客户端
-	metricsClient, err := versioned.NewForConfig(client.Config)
-	if err != nil {
-		return nil, fmt.Errorf("无法创建metrics客户端: %w", err)
-	}
-
 	return &PodCollector{
-		client:       client,
-		metricsClient: metricsClient,
+		client: client,
 	}, nil
 }
 
 // GetPods 获取指定命名空间中的所有Pod信息
 func (pc *PodCollector) GetPods(ctx context.Context, namespace string) (*models.PodList, error) {
-	// 获取Pod列表
-	pods, err := pc.client.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	// 通过 cluster 层接口获取 Pod 列表
+	pods, err := pc.client.ListRawPods(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("获取Pod列表失败: %w", err)
 	}
-	
-	// 获取Pod指标
-	var podMetrics *metricsv1beta1.PodMetricsList
+
+	// 通过 cluster 层接口获取 Pod 指标
+	podMetricsList, err := pc.client.ListRawPodMetrics(ctx, namespace)
 	podMetricsMap := make(map[string]map[string]corev1.ResourceList) // namespace/podName -> containerName -> metrics
-	
-	podMetrics, err = pc.metricsClient.MetricsV1beta1().PodMetricses(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		// 记录错误但继续执行，因为指标不是必需的
 		fmt.Printf("警告: 获取Pod指标失败: %v\n", err)
 	} else {
-		// 创建指标映射，方便查找
-		for _, metric := range podMetrics.Items {
+		for _, metric := range podMetricsList {
 			key := fmt.Sprintf("%s/%s", metric.Namespace, metric.Name)
 			if _, exists := podMetricsMap[key]; !exists {
 				podMetricsMap[key] = make(map[string]corev1.ResourceList)
 			}
-			
 			for _, container := range metric.Containers {
 				podMetricsMap[key][container.Name] = container.Usage
 			}
 		}
 	}
-	
-	// 转换为内部Pod模型
+
 	podList := &models.PodList{
-		Items: make([]models.Pod, 0, len(pods.Items)),
+		Items: make([]models.Pod, 0, len(pods)),
 	}
-	
-	for _, pod := range pods.Items {
-		// 获取Pod相关事件
-		events, err := pc.getPodEvents(ctx, pod.Namespace, pod.Name)
+
+	for _, pod := range pods {
+		// 通过 cluster 层接口获取事件
+		events, err := pc.client.GetRawPodEvents(ctx, pod.Namespace, pod.Name)
+		modelEvents := make([]models.Event, 0, len(events))
 		if err != nil {
-			// 记录错误但继续执行，因为事件不是必需的
 			fmt.Printf("警告: 获取Pod %s/%s 的事件失败: %v\n", pod.Namespace, pod.Name, err)
+		} else {
+			for _, event := range events {
+				modelEvents = append(modelEvents, models.Event{
+					Type:    string(event.Type),
+					Reason:  event.Reason,
+					Message: event.Message,
+					Time:    event.LastTimestamp.Time,
+					Count:   int(event.Count),
+				})
+			}
 		}
-		
-		// 转换Pod
-		modelPod := convertPodToModel(&pod, podMetricsMap, events)
+		modelPod := convertPodToModel(&pod, podMetricsMap, modelEvents)
 		podList.Items = append(podList.Items, modelPod)
-		
-		// 更新统计信息
 		podList.TotalCount++
 		switch pod.Status.Phase {
 		case corev1.PodRunning:
@@ -99,110 +88,49 @@ func (pc *PodCollector) GetPods(ctx context.Context, namespace string) (*models.
 			podList.UnknownCount++
 		}
 	}
-	
 	return podList, nil
 }
 
 // GetPod 获取单个Pod信息
 func (pc *PodCollector) GetPod(ctx context.Context, namespace, name string) (*models.Pod, error) {
-	// 获取单个Pod
-	pod, err := pc.client.Clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+	pod, err := pc.client.GetRawPod(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("获取Pod失败: %w", err)
 	}
-	
-	// 获取Pod指标
-	var podMetric *metricsv1beta1.PodMetrics
-	podMetricsMap := make(map[string]map[string]corev1.ResourceList) // namespace/podName -> containerName -> metrics
-	
-	podMetric, err = pc.metricsClient.MetricsV1beta1().PodMetricses(namespace).Get(ctx, name, metav1.GetOptions{})
+	podMetric, err := pc.client.GetRawPodMetrics(ctx, namespace, name)
+	podMetricsMap := make(map[string]map[string]corev1.ResourceList)
 	if err != nil {
-		// 记录错误但继续执行，因为指标不是必需的
 		fmt.Printf("警告: 获取Pod指标失败: %v\n", err)
-	} else {
+	} else if podMetric != nil {
 		key := fmt.Sprintf("%s/%s", podMetric.Namespace, podMetric.Name)
 		podMetricsMap[key] = make(map[string]corev1.ResourceList)
-		
 		for _, container := range podMetric.Containers {
 			podMetricsMap[key][container.Name] = container.Usage
 		}
 	}
-	
-	// 获取Pod相关事件
-	events, err := pc.getPodEvents(ctx, namespace, name)
+	// 通过 cluster 层接口获取事件
+	modelEvents := []models.Event{}
+	events, err := pc.client.GetRawPodEvents(ctx, namespace, name)
 	if err != nil {
-		// 记录错误但继续执行，因为事件不是必需的
 		fmt.Printf("警告: 获取Pod事件失败: %v\n", err)
+	} else {
+		for _, event := range events {
+			modelEvents = append(modelEvents, models.Event{
+				Type:    string(event.Type),
+				Reason:  event.Reason,
+				Message: event.Message,
+				Time:    event.LastTimestamp.Time,
+				Count:   int(event.Count),
+			})
+		}
 	}
-	
-	// 转换为内部Pod模型
-	modelPod := convertPodToModel(pod, podMetricsMap, events)
-	
+	modelPod := convertPodToModel(pod, podMetricsMap, modelEvents)
 	return &modelPod, nil
 }
 
 // GetPodLogs 获取Pod日志
 func (pc *PodCollector) GetPodLogs(ctx context.Context, namespace, name string, containerName string, lines int) ([]string, error) {
-	// 设置日志选项
-	podLogOptions := corev1.PodLogOptions{
-		Container: containerName,
-		TailLines: int64Ptr(int64(lines)),
-	}
-	
-	// 获取日志
-	req := pc.client.Clientset.CoreV1().Pods(namespace).GetLogs(name, &podLogOptions)
-	podLogs, err := req.Stream(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("获取Pod日志失败: %w", err)
-	}
-	defer podLogs.Close()
-	
-	// 读取日志
-	buf := make([]byte, 2048)
-	var logContent strings.Builder
-	for {
-		n, err := podLogs.Read(buf)
-		if err != nil {
-			break
-		}
-		logContent.Write(buf[:n])
-	}
-	
-	// 按行分割日志
-	logs := strings.Split(logContent.String(), "\n")
-	if len(logs) > 0 && logs[len(logs)-1] == "" {
-		logs = logs[:len(logs)-1] // 移除最后一个空行
-	}
-	
-	return logs, nil
-}
-
-// getPodEvents 获取与Pod相关的事件
-func (pc *PodCollector) getPodEvents(ctx context.Context, namespace, name string) ([]models.Event, error) {
-	// 创建字段选择器，只选择与指定Pod相关的事件
-	fieldSelector := fmt.Sprintf("involvedObject.kind=Pod,involvedObject.name=%s,involvedObject.namespace=%s", name, namespace)
-	
-	// 获取事件
-	events, err := pc.client.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
-		FieldSelector: fieldSelector,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("获取Pod事件失败: %w", err)
-	}
-	
-	// 转换为内部事件模型
-	modelEvents := make([]models.Event, 0, len(events.Items))
-	for _, event := range events.Items {
-		modelEvents = append(modelEvents, models.Event{
-			Type:    string(event.Type),
-			Reason:  event.Reason,
-			Message: event.Message,
-			Time:    event.LastTimestamp.Time,
-			Count:   int(event.Count),
-		})
-	}
-	
-	return modelEvents, nil
+	return pc.client.GetRawPodLogs(ctx, namespace, name, containerName, lines)
 }
 
 // convertPodToModel 将Kubernetes Pod转换为内部Pod模型

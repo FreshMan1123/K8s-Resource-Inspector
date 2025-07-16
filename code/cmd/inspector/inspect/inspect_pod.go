@@ -1,6 +1,7 @@
 package inspect
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/report"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/collector"
 	"github.com/spf13/cobra"
 )
 
@@ -80,7 +82,9 @@ func runPodInspect(podName, namespace, kubeconfig, contextName, outputFormat str
 
 	// 创建分析器并设置客户端
 	analyzer := pod.NewPodAnalyzer(rulesEngine)
-	analyzer.SetClient(client)
+	// 创建 podCollector 并注入 analyzer
+	podCollector, _ := collector.NewPodCollector(client)
+	analyzer.SetCollector(podCollector)
 
 	// 分析Pod
 	var results []*pod.AnalysisResult
@@ -95,7 +99,7 @@ func runPodInspect(podName, namespace, kubeconfig, contextName, outputFormat str
 		// 如果需要获取日志
 		if fetchLogs {
 			for _, container := range result.Containers {
-				logs, err := client.GetPodLogs(namespace, podName, container.Name, logLines)
+				logs, err := podCollector.GetPodLogs(context.TODO(), namespace, podName, container.Name, logLines)
 				if err != nil {
 					fmt.Printf("警告: 获取容器 %s 日志失败: %v\n", container.Name, err)
 					continue
@@ -176,7 +180,7 @@ func runPodInspect(podName, namespace, kubeconfig, contextName, outputFormat str
 					
 					// 获取该Pod的所有容器
 					for _, container := range result.Containers {
-						logs, err := client.GetPodLogs(result.Namespace, result.PodName, container.Name, logLines)
+						logs, err := podCollector.GetPodLogs(context.TODO(), result.Namespace, result.PodName, container.Name, logLines)
 						if err != nil {
 							fmt.Printf("警告: 获取容器 %s 日志失败: %v\n", container.Name, err)
 							continue

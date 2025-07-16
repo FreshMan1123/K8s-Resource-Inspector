@@ -9,7 +9,6 @@ import (
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
 	
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/metrics/pkg/client/clientset/versioned"
 )
@@ -45,26 +44,22 @@ func NewNodeCollector(client *cluster.Client) (NodeCollector, error) {
 
 // GetNodes 获取所有节点信息
 func (nc *nodeCollectorImpl) GetNodes(ctx context.Context) (*models.NodeList, error) {
-	// 获取节点列表
-	nodes, err := nc.client.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	// 通过 cluster 层获取原生 Node
+	nodes, err := nc.client.ListRawNodes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取节点列表失败: %w", err)
 	}
-	
-	// 获取节点指标
-	nodeMetrics, err := nc.metricsClient.MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
+	// 通过 cluster 层获取原生 Node metrics
+	nodeMetricsList, err := nc.client.ListRawNodeMetrics(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取节点指标失败: %w", err)
 	}
-	
-	// 创建指标映射，方便查找
 	metricsMap := make(map[string]corev1.ResourceList)
-	for _, metric := range nodeMetrics.Items {
+	for _, metric := range nodeMetricsList {
 		metricsMap[metric.Name] = metric.Usage
 	}
-	
-	// 获取所有Pod以计算已分配资源
-	pods, err := nc.client.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	// 通过 cluster 层获取所有 Pod
+	pods, err := nc.client.ListRawPods(ctx, "")
 	if err != nil {
 		return nil, fmt.Errorf("获取Pod列表失败: %w", err)
 	}
@@ -74,7 +69,7 @@ func (nc *nodeCollectorImpl) GetNodes(ctx context.Context) (*models.NodeList, er
 	// 计算每个节点上的Pod数量
 	nodeTotalPods := make(map[string]int)
 	
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
 		if nodeName == "" {
 			continue
@@ -129,10 +124,10 @@ func (nc *nodeCollectorImpl) GetNodes(ctx context.Context) (*models.NodeList, er
 	
 	// 转换为内部节点模型
 	nodeList := &models.NodeList{
-		Items: make([]models.Node, 0, len(nodes.Items)),
+		Items: make([]models.Node, 0, len(nodes)),
 	}
 	
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		modelNode := convertNodeToModel(&node, metricsMap[node.Name], nodeAllocatedResources[node.Name])
 		// 设置总Pod数量
 		modelNode.TotalPods = nodeTotalPods[node.Name]
@@ -153,57 +148,52 @@ func (nc *nodeCollectorImpl) GetNodes(ctx context.Context) (*models.NodeList, er
 
 // GetNode 获取单个节点信息
 func (nc *nodeCollectorImpl) GetNode(ctx context.Context, name string) (*models.Node, error) {
-	// 获取单个节点
-	node, err := nc.client.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	// 通过 cluster 层获取单个 Node
+	node, err := nc.client.GetRawNode(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("获取节点失败: %w", err)
 	}
-	
-	// 获取节点指标
-	nodeMetric, err := nc.metricsClient.MetricsV1beta1().NodeMetricses().Get(ctx, name, metav1.GetOptions{})
+	// 通过 cluster 层获取 Node metrics
+	nodeMetric, err := nc.client.GetRawNodeMetrics(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("获取节点指标失败: %w", err)
 	}
-	
-	// 获取调度到该节点的所有Pod
-	pods, err := nc.client.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("spec.nodeName=%s", name),
-	})
+	// 通过 cluster 层获取所有 Pod，再过滤出调度到该节点的 Pod
+	pods, err := nc.client.ListRawPods(ctx, "")
 	if err != nil {
 		return nil, fmt.Errorf("获取Pod列表失败: %w", err)
 	}
-	
+	var nodePods []corev1.Pod
+	for _, pod := range pods {
+		if pod.Spec.NodeName == name {
+			nodePods = append(nodePods, pod)
+		}
+	}
+	podList := &corev1.PodList{Items: nodePods}
 	// 计算已分配资源
 	allocatedResources := make(map[corev1.ResourceName]resource.Quantity)
 	allocatedResources[corev1.ResourceCPU] = resource.Quantity{}
 	allocatedResources[corev1.ResourceMemory] = resource.Quantity{}
 	allocatedResources[corev1.ResourceEphemeralStorage] = resource.Quantity{}
 	allocatedResources["pods"] = resource.Quantity{}
-	
 	runningPods := 0
-	totalPods := len(pods.Items) // 总Pod数量
-	for _, pod := range pods.Items {
-		// 忽略已完成的Pod
+	totalPods := len(podList.Items)
+	for _, pod := range podList.Items {
 		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 			continue
 		}
-		
 		runningPods++
-		
-		// 累加Pod请求的资源
 		for _, container := range pod.Spec.Containers {
 			if cpu, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
 				cpuQuant := allocatedResources[corev1.ResourceCPU]
 				cpuQuant.Add(cpu)
 				allocatedResources[corev1.ResourceCPU] = cpuQuant
 			}
-			
 			if memory, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
 				memoryQuant := allocatedResources[corev1.ResourceMemory]
 				memoryQuant.Add(memory)
 				allocatedResources[corev1.ResourceMemory] = memoryQuant
 			}
-			
 			if storage, ok := container.Resources.Requests[corev1.ResourceEphemeralStorage]; ok {
 				storageQuant := allocatedResources[corev1.ResourceEphemeralStorage]
 				storageQuant.Add(storage)
@@ -211,13 +201,9 @@ func (nc *nodeCollectorImpl) GetNode(ctx context.Context, name string) (*models.
 			}
 		}
 	}
-	
-	// 增加Pod计数
 	allocatedResources["pods"] = *resource.NewQuantity(int64(runningPods), resource.DecimalSI)
-	
-	// 转换为内部节点模型
 	modelNode := convertNodeToModel(node, nodeMetric.Usage, allocatedResources)
-	modelNode.TotalPods = totalPods // 设置总Pod数量
+	modelNode.TotalPods = totalPods
 	return &modelNode, nil
 }
 
@@ -255,7 +241,7 @@ func convertNodeToModel(node *corev1.Node, usage corev1.ResourceList, allocated 
 		Schedulable:  schedulable,
 		Labels:       node.Labels,
 		Taints:       node.Spec.Taints,
-		RunningPods:  int(podsQ.Value()),
+		RunningPods:  int(podsQ.AsApproximateFloat64()),
 		CustomMetrics: make(map[string]models.CustomMetric),
 		NodeInfo: models.NodeInfo{
 			KernelVersion:           node.Status.NodeInfo.KernelVersion,
@@ -357,10 +343,10 @@ func convertNodeToModel(node *corev1.Node, usage corev1.ResourceList, allocated 
 // calculateResourceMetric 计算资源指标
 func calculateResourceMetric(capacity, allocatable, allocated, used resource.Quantity) models.ResourceMetric {
 	metric := models.ResourceMetric{
-		Capacity:    capacity,
-		Allocatable: allocatable,
-		Allocated:   allocated,
-		Used:        used,
+		Capacity:    capacity.AsApproximateFloat64(),
+		Allocatable: allocatable.AsApproximateFloat64(),
+		Allocated:   allocated.AsApproximateFloat64(),
+		Used:        used.AsApproximateFloat64(),
 	}
 	
 	// 计算资源利用率 (使用量/已分配量)
