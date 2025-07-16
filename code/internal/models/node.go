@@ -4,23 +4,23 @@ import (
 	"time"
 	
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+	//"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // ResourceMetric 表示资源指标
 type ResourceMetric struct {
-	// 资源总量
-	Capacity resource.Quantity
-	// 可分配资源总量
-	Allocatable resource.Quantity
-	// 已分配给Pod的资源量
-	Allocated resource.Quantity
-	// 实际使用的资源量
-	Used resource.Quantity
-	// 资源利用率（Used/Allocated），以百分比表示
-	Utilization float64
-	// 资源分配率（Allocated/Allocatable），以百分比表示
-	AllocationRate float64
+	// 总量（Mi）
+	Capacity float64 `json:"capacity"`
+	// 可分配量（Mi）
+	Allocatable float64 `json:"allocatable"`
+	// 已分配量（Mi）
+	Allocated float64 `json:"allocated"`
+	// 已使用量（Mi）
+	Used float64 `json:"used"`
+	// 利用率（百分比）
+	Utilization float64 `json:"utilization"`
+	// 分配率（百分比）
+	AllocationRate float64 `json:"allocationRate"`
 }
 
 // NodeConditionStatus 表示节点条件状态

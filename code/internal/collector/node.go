@@ -299,13 +299,41 @@ func convertNodeToModel(node *corev1.Node, usage corev1.ResourceList, allocated 
 		usage[corev1.ResourceCPU],
 	)
 	
-	// 处理内存资源
-	modelNode.Memory = calculateResourceMetric(
-		node.Status.Capacity[corev1.ResourceMemory],
-		node.Status.Allocatable[corev1.ResourceMemory],
-		allocated[corev1.ResourceMemory],
-		usage[corev1.ResourceMemory],
-	)
+	// 处理内存资源（全部转为 Mi 单位，float64 存储与展示）
+	// 节点声明的物理内存总量（Mi）
+	memCapacityQ := node.Status.Capacity[corev1.ResourceMemory]
+	memCapacityMi := (&memCapacityQ).AsApproximateFloat64() / 1024 / 1024
+
+	// 节点可分配给 Pod 的内存总量（Mi）
+	memAllocatableQ := node.Status.Allocatable[corev1.ResourceMemory]
+	memAllocatableMi := (&memAllocatableQ).AsApproximateFloat64() / 1024 / 1024
+
+	// 当前已分配给所有 Pod 的内存总量（Mi）
+	memAllocatedQ := allocated[corev1.ResourceMemory]
+	memAllocatedMi := (&memAllocatedQ).AsApproximateFloat64() / 1024 / 1024
+
+	// 节点实际使用的内存总量（Mi）
+	memUsedQ := usage[corev1.ResourceMemory]
+	memUsedMi := (&memUsedQ).AsApproximateFloat64() / 1024 / 1024
+
+	modelNode.Memory = models.ResourceMetric{
+		Capacity:    memCapacityMi,
+		Allocatable: memAllocatableMi,
+		Allocated:   memAllocatedMi,
+		Used:        memUsedMi,
+		Utilization: func() float64 {
+			if memCapacityMi > 0 {
+				return memUsedMi / memCapacityMi * 100
+			}
+			return 0
+		}(),
+		AllocationRate: func() float64 {
+			if memAllocatableMi > 0 {
+				return memAllocatedMi / memAllocatableMi * 100
+			}
+			return 0
+		}(),
+	}
 	
 	// 处理临时存储资源
 	modelNode.EphemeralStorage = calculateResourceMetric(

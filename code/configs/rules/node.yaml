@@ -45,13 +45,13 @@ rules:
     enabled: true
   
   - id: "node-high-pods"
-    name: "节点Pod数量过多"
-    description: "节点上运行的Pod数量接近上限"
+    name: "节点异常Pod数量过多"
+    description: "节点上运行的异常Pod数量占比超过20%"
     category: "node"
     condition:
       metric: "pods_utilization"
-      operator: ">="
+      operator: "<="
       threshold: 80
     severity: "info"
-    remediation: "考虑扩展集群，增加更多节点"
+    remediation: "跟进异常Pod数量，必要时进行扩容"
     enabled: true 
