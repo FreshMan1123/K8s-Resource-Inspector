@@ -106,11 +106,9 @@ func (c *MockPodClient) GetPod(key string) (*models.Pod, error) {
 
 	// 添加容器
 	for _, c := range data.Containers {
-		cpuRequests, _ := resource.ParseQuantity(c.Resources.Requests.CPU)
 		cpuLimits, _ := resource.ParseQuantity(c.Resources.Limits.CPU)
 		cpuUsage, _ := resource.ParseQuantity(c.Metrics.CPUUsage)
 		
-		memRequests, _ := resource.ParseQuantity(c.Resources.Requests.Memory)
 		memLimits, _ := resource.ParseQuantity(c.Resources.Limits.Memory)
 		memUsage, _ := resource.ParseQuantity(c.Metrics.MemoryUsage)
 		
@@ -132,14 +130,10 @@ func (c *MockPodClient) GetPod(key string) (*models.Pod, error) {
 			Ready:        c.Ready,
 			RestartCount: c.RestartCount,
 			CPU: models.ResourceMetric{
-				Requests:    cpuRequests,
-				Limits:      cpuLimits,
 				Used:        cpuUsage,
 				Utilization: cpuUtilization,
 			},
 			Memory: models.ResourceMetric{
-				Requests:    memRequests,
-				Limits:      memLimits,
 				Used:        memUsage,
 				Utilization: memUtilization,
 			},
@@ -299,12 +293,10 @@ func TestPodRuleEvaluation(t *testing.T) {
 				Name:  "high-cpu-container",
 				Image: "test:latest",
 				CPU: models.ResourceMetric{
-					Limits:      *resource.NewQuantity(1000, resource.DecimalSI),
 					Used:        *resource.NewQuantity(950, resource.DecimalSI),
 					Utilization: 95.0, // 95% CPU使用率，应该触发告警
 				},
 				Memory: models.ResourceMetric{
-					Limits:      *resource.NewQuantity(1024*1024*1024, resource.BinarySI),
 					Used:        *resource.NewQuantity(512*1024*1024, resource.BinarySI),
 					Utilization: 50.0, // 50% 内存使用率，应该正常
 				},
@@ -326,7 +318,7 @@ func TestPodRuleEvaluation(t *testing.T) {
 	// 检查CPU高使用率规则是否被触发
 	cpuRuleTriggered := false
 	for _, item := range result.Items {
-		if item.Metric == "container_cpu_utilization" && !item.Passed {
+		if item.Metric == "pod_cpu_utilization" && !item.Passed {
 			cpuRuleTriggered = true
 			break
 		}
@@ -339,7 +331,7 @@ func TestPodRuleEvaluation(t *testing.T) {
 	// 检查内存使用率规则是否正常（不应该被触发）
 	memoryRuleTriggered := false
 	for _, item := range result.Items {
-		if item.Metric == "container_memory_utilization" && !item.Passed {
+		if item.Metric == "pod_memory_utilization" && !item.Passed {
 			memoryRuleTriggered = true
 			break
 		}

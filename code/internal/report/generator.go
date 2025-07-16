@@ -2,6 +2,7 @@ package report
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node"
@@ -147,15 +148,31 @@ func (g *DefaultGenerator) GeneratePodReport(results []*pod.AnalysisResult, rule
 
 	// 添加Pod详情
 	for _, result := range results {
+		podDisplayName := "pod "
+		if result.Namespace != "" {
+			podDisplayName += result.Namespace + "/" + result.PodName
+		} else {
+			podDisplayName += result.PodName
+		}
 		// 添加发现项
 		for _, item := range result.Items {
 			if !item.Passed {
 				severity := mapSeverity(item.Severity)
+				// 统一Message内容
+				msg := item.Description
+				// 替换“容器 xxx 缺少资源限制”为“Pod <namespace>/<pod-name> 缺少资源限制”
+				if strings.Contains(msg, "容器") && strings.Contains(msg, "缺少资源限制") {
+					msg = podDisplayName + " 缺少资源限制"
+				} else if strings.Contains(msg, "容器") {
+					msg = strings.ReplaceAll(msg, "容器", podDisplayName)
+				} else if strings.Contains(msg, "Pod缺少健康检查探针") {
+					msg = podDisplayName + " 缺少健康检查探针"
+				}
 				finding := Finding{
-					ResourceName: result.PodName,
+					ResourceName: podDisplayName,
 					ResourceKind: "Pod",
 					RuleID:       item.RuleID,
-					Message:      item.Description,
+					Message:      msg,
 					Severity:     severity,
 					Recommendation: item.Remediation,
 					Details: map[string]interface{}{

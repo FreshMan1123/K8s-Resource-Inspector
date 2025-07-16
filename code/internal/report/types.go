@@ -5,6 +5,7 @@ import (
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/pod"
 )
 
 // Severity 定义报告发现项的重要性级别
@@ -175,6 +176,8 @@ type ReportSummary struct {
 type Generator interface {
 	// GenerateNodeReport 从节点分析结果创建报告
 	GenerateNodeReport(results []node.AnalysisResult, rules []rules.Rule) *Report
+	// GeneratePodReport 从Pod分析结果创建报告
+	GeneratePodReport(results []*pod.AnalysisResult, rules []rules.Rule) *Report
 }
 
 // Formatter 定义报告输出格式化的接口
