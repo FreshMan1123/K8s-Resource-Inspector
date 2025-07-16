@@ -3,8 +3,9 @@ package node
 import (
 	"fmt"
 	"time"
+	"context"
 
-	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/collector"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
 )
@@ -120,29 +121,23 @@ type AnalysisResult struct {
 }
 
 // NodeAnalyzer 节点资源分析器
+// 依赖 collector.NodeCollector 接口
 type NodeAnalyzer struct {
 	rulesEngine *rules.Engine
-	client      *cluster.Client
+	collector   collector.NodeCollector
 }
 
 // NewNodeAnalyzer 创建节点分析器
-func NewNodeAnalyzer(rulesEngine *rules.Engine) *NodeAnalyzer {
+func NewNodeAnalyzer(rulesEngine *rules.Engine, collector collector.NodeCollector) *NodeAnalyzer {
 	return &NodeAnalyzer{
 		rulesEngine: rulesEngine,
+		collector:   collector,
 	}
 }
 
-// NewNodeAnalyzerWithClient 创建带有集群客户端的节点分析器
-func NewNodeAnalyzerWithClient(rulesEngine *rules.Engine, client *cluster.Client) *NodeAnalyzer {
-	return &NodeAnalyzer{
-		rulesEngine: rulesEngine,
-		client:      client,
-	}
-}
-
-// SetClient 设置集群客户端
-func (na *NodeAnalyzer) SetClient(client *cluster.Client) {
-	na.client = client
+// SetCollector 设置节点采集器
+func (na *NodeAnalyzer) SetCollector(collector collector.NodeCollector) {
+	na.collector = collector
 }
 
 // AnalyzeNode 分析单个节点
@@ -227,33 +222,27 @@ func (na *NodeAnalyzer) AnalyzeNode(node *models.Node) (*AnalysisResult, error) 
 
 // AnalyzeNodeByName 根据节点名称分析节点
 func (na *NodeAnalyzer) AnalyzeNodeByName(nodeName string) (*AnalysisResult, error) {
-	if na.client == nil {
-		return nil, fmt.Errorf("未设置集群客户端")
+	if na.collector == nil {
+		return nil, fmt.Errorf("未设置节点采集器")
 	}
-
-	// 获取节点数据
-	node, err := na.client.GetNode(nodeName)
+	// 通过 collector 获取节点数据
+	node, err := na.collector.GetNode(context.TODO(), nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("获取节点数据失败: %w", err)
 	}
-
-	// 分析节点
 	return na.AnalyzeNode(node)
 }
 
 // AnalyzeAllNodes 分析所有节点
 func (na *NodeAnalyzer) AnalyzeAllNodes() ([]AnalysisResult, error) {
-	if na.client == nil {
-		return nil, fmt.Errorf("未设置集群客户端")
+	if na.collector == nil {
+		return nil, fmt.Errorf("未设置节点采集器")
 	}
-
-	// 获取所有节点
-	nodeList, err := na.client.ListNodes()
+	// 通过 collector 获取所有节点
+	nodeList, err := na.collector.GetNodes(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("获取节点列表失败: %w", err)
 	}
-
-	// 分析所有节点
 	results := make([]AnalysisResult, 0, len(nodeList.Items))
 	for i := range nodeList.Items {
 		result, err := na.AnalyzeNode(&nodeList.Items[i])
@@ -262,7 +251,6 @@ func (na *NodeAnalyzer) AnalyzeAllNodes() ([]AnalysisResult, error) {
 		}
 		results = append(results, *result)
 	}
-
 	return results, nil
 }
 

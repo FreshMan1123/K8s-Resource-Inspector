@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/metrics/pkg/client/clientset/versioned"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	"k8s.io/client-go/rest"
 )
 
 // Client 表示Kubernetes集群客户端
@@ -28,6 +29,7 @@ type Client struct {
 	ContextName string
 	// MetricsClient 是获取指标数据的客户端
 	MetricsClient *versioned.Clientset
+	Config *rest.Config // 新增字段
 }
 
 // NewClient 创建一个新的Kubernetes客户端
@@ -80,6 +82,7 @@ func NewClient(configPath string, contextName string) (*Client, error) {
 		ConfigPath: configPath,
 		ContextName: contextName,
 		MetricsClient: metricsClient,
+		Config: config, // 赋值
 	}, nil
 }
 

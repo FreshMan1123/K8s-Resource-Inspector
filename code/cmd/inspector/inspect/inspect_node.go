@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/collector"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/report"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
@@ -63,7 +64,13 @@ func runNodeInspect(nodeName string) error {
 		return fmt.Errorf("创建集群客户端失败: %w", err)
 	}
 
-	// 获取集群信息 - 这里使用现有的client方法
+	// 创建节点采集器
+	collectorInst, err := collector.NewNodeCollector(client)
+	if err != nil {
+		return fmt.Errorf("创建节点采集器失败: %w", err)
+	}
+
+	// 获取集群信息
 	clusterName := "default-cluster"
 	if *contextName != "" {
 		clusterName = *contextName
@@ -84,9 +91,8 @@ func runNodeInspect(nodeName string) error {
 		return fmt.Errorf("加载规则引擎失败: %w", err)
 	}
 
-	// 创建分析器并设置客户端
-	analyzer := node.NewNodeAnalyzer(rulesEngine)
-	analyzer.SetClient(client)
+	// 创建分析器并注入采集器
+	analyzer := node.NewNodeAnalyzer(rulesEngine, collectorInst)
 
 	// 分析节点
 	var results []node.AnalysisResult

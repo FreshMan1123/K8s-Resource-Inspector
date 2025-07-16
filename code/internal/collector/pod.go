@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/metrics/pkg/client/clientset/versioned"
+	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -45,7 +46,7 @@ func (pc *PodCollector) GetPods(ctx context.Context, namespace string) (*models.
 	}
 	
 	// 获取Pod指标
-	var podMetrics *versioned.PodMetricsList
+	var podMetrics *metricsv1beta1.PodMetricsList
 	podMetricsMap := make(map[string]map[string]corev1.ResourceList) // namespace/podName -> containerName -> metrics
 	
 	podMetrics, err = pc.metricsClient.MetricsV1beta1().PodMetricses(namespace).List(ctx, metav1.ListOptions{})
@@ -111,7 +112,7 @@ func (pc *PodCollector) GetPod(ctx context.Context, namespace, name string) (*mo
 	}
 	
 	// 获取Pod指标
-	var podMetric *versioned.PodMetrics
+	var podMetric *metricsv1beta1.PodMetrics
 	podMetricsMap := make(map[string]map[string]corev1.ResourceList) // namespace/podName -> containerName -> metrics
 	
 	podMetric, err = pc.metricsClient.MetricsV1beta1().PodMetricses(namespace).Get(ctx, name, metav1.GetOptions{})

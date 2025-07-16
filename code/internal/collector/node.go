@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
@@ -15,29 +14,37 @@ import (
 	"k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-// NodeCollector 节点数据收集器
-type NodeCollector struct {
+// NodeCollector 接口，统一节点采集入口
+// 便于依赖注入和 mock
+//
+type NodeCollector interface {
+	GetNodes(ctx context.Context) (*models.NodeList, error)
+	GetNode(ctx context.Context, name string) (*models.Node, error)
+}
+
+// nodeCollectorImpl 节点数据收集器实现
+type nodeCollectorImpl struct {
 	client *cluster.Client
 	//用于访问 Kubernetes Metrics API 的客户端，用于获取节点指标
 	metricsClient *versioned.Clientset
 }
 
 // NewNodeCollector 创建一个新的节点收集器
-func NewNodeCollector(client *cluster.Client) (*NodeCollector, error) {
+func NewNodeCollector(client *cluster.Client) (NodeCollector, error) {
 	// 创建metrics客户端
 	metricsClient, err := versioned.NewForConfig(client.Config)
 	if err != nil {
 		return nil, fmt.Errorf("无法创建metrics客户端: %w", err)
 	}
 
-	return &NodeCollector{
+	return &nodeCollectorImpl{
 		client: client,
 		metricsClient: metricsClient,
 	}, nil
 }
 
 // GetNodes 获取所有节点信息
-func (nc *NodeCollector) GetNodes(ctx context.Context) (*models.NodeList, error) {
+func (nc *nodeCollectorImpl) GetNodes(ctx context.Context) (*models.NodeList, error) {
 	// 获取节点列表
 	nodes, err := nc.client.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -145,7 +152,7 @@ func (nc *NodeCollector) GetNodes(ctx context.Context) (*models.NodeList, error)
 }
 
 // GetNode 获取单个节点信息
-func (nc *NodeCollector) GetNode(ctx context.Context, name string) (*models.Node, error) {
+func (nc *nodeCollectorImpl) GetNode(ctx context.Context, name string) (*models.Node, error) {
 	// 获取单个节点
 	node, err := nc.client.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
@@ -238,6 +245,7 @@ func convertNodeToModel(node *corev1.Node, usage corev1.ResourceList, allocated 
 	schedulable := !node.Spec.Unschedulable
 	
 	// 初始化Node模型
+	podsQ := allocated["pods"]
 	modelNode := models.Node{
 		Name:         node.Name,
 		Roles:        roles,
@@ -247,7 +255,7 @@ func convertNodeToModel(node *corev1.Node, usage corev1.ResourceList, allocated 
 		Schedulable:  schedulable,
 		Labels:       node.Labels,
 		Taints:       node.Spec.Taints,
-		RunningPods:  int(allocated["pods"].Value()),
+		RunningPods:  int(podsQ.Value()),
 		CustomMetrics: make(map[string]models.CustomMetric),
 		NodeInfo: models.NodeInfo{
 			KernelVersion:           node.Status.NodeInfo.KernelVersion,
