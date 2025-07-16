@@ -1,0 +1,62 @@
+# GitHub Actions 工作流：Go CI & Release
+# 本工作流实现持续集成（CI）和自动发布 Release（CD）
+
+on:
+  push:
+    branches: [ master, main ] # 监听主分支的 push 事件
+    tags: [ 'v*.*.*' ]         # 监听以 v 开头的 tag push 事件（如 v1.0.0）
+  pull_request:
+    branches: [ master, main ] # 监听主分支的 PR 事件
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest     # 使用 Ubuntu 最新云主机作为 runner
+    steps:
+      - name: Checkout code    # 步骤1：拉取仓库代码
+        uses: actions/checkout@v3
+
+      - name: Set up Go        # 步骤2：安装 Go 环境
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'  # 指定 Go 版本
+
+      - name: Install dependencies # 步骤3：安装依赖
+        run: go mod download
+
+      - name: Lint             # 步骤4：代码静态检查
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest # 安装 lint 工具
+          golangci-lint run ./... # 执行 lint 检查
+
+      - name: Build (Linux amd64) # 步骤5：交叉编译 Linux 版本
+        run: GOOS=linux GOARCH=amd64 go build -o inspector-linux-amd64 ./code/cmd/inspector/
+
+      - name: Build (Windows amd64) # 步骤6：交叉编译 Windows 版本
+        run: GOOS=windows GOARCH=amd64 go build -o inspector-windows-amd64.exe ./code/cmd/inspector/
+
+      - name: Run unit/component tests (skip integration) # 步骤7：进行测试
+        run: go test -v -short ./code/test/...
+
+
+  release:
+    needs: build-test          # 依赖 build-test 任务全部通过后才执行
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') # 仅在打 tag 时执行
+    steps:
+      - uses: actions/checkout@v3 # 步骤1：拉取代码
+      - name: Set up Go           # 步骤2：安装 Go 环境
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - name: Build (Linux amd64) # 步骤3：交叉编译 Linux 版本
+        run: GOOS=linux GOARCH=amd64 go build -o inspector-linux-amd64 ./code/cmd/inspector/
+      - name: Build (Windows amd64) # 步骤4：交叉编译 Windows 版本
+        run: GOOS=windows GOARCH=amd64 go build -o inspector-windows-amd64.exe ./code/cmd/inspector/
+      - name: Upload Release Assets # 步骤5：上传产物到 GitHub Release
+        uses: softprops/action-gh-release@v1  #这个uses会自动获取我们打的tag以实现上传
+        with:
+          files: |
+            inspector-linux-amd64
+            inspector-windows-amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 用于认证，自动获取，无需手动配置 
