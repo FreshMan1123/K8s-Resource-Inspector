@@ -13,25 +13,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// 共享配置选项（与node一致）
+// 共享配置选项
 var (
 	depKubeconfig   *string
 	depContextName  *string
-	depOutputFormat *string
-	depNoColor      *bool
 	depRulesFile    *string
-	depOutputFile   *string
-	depOnlyIssues   *bool
 )
 
-func NewDeploymentCommand(kubecfg, ctx, outFmt *string, noClr, onlyIss *bool, rFile, outFile *string) *cobra.Command {
+func NewDeploymentCommand(kubecfg, ctx *string, rFile *string) *cobra.Command {
 	depKubeconfig = kubecfg
 	depContextName = ctx
-	depOutputFormat = outFmt
-	depNoColor = noClr
 	depRulesFile = rFile
-	depOutputFile = outFile
-	depOnlyIssues = onlyIss
 
 	cmd := &cobra.Command{
 		Use:   "deployment",
@@ -77,6 +69,9 @@ func runDeploymentInspect() error {
 
 	// 分析与规则适配
 	for _, dep := range deployments {
+		hasIssues := false
+		var failedChecks []string
+
 		for _, rule := range rulesList {
 			var actualValue interface{}
 			var metricType string
@@ -96,13 +91,35 @@ func runDeploymentInspect() error {
 			default:
 				continue
 			}
+
 			result, err := rulesEngine.EvaluateRule(rule, metricType, actualValue)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "规则评估失败: %v\n", err)
 				continue
 			}
-			// 这里可收集result，后续生成报告
-			fmt.Printf("Deployment %s/%s 规则[%s] 检查结果: %v\n", dep.Namespace, dep.Name, rule.ID, result.Passed)
+
+			// 只记录失败的检查
+			if !result.Passed {
+				hasIssues = true
+				// 由于result.Message已经包含了rule.Name，我们直接使用Message
+				// 或者提取Message中除了rule.Name之外的部分
+				message := result.Message
+				if len(message) > len(rule.Name)+2 && message[:len(rule.Name)+2] == rule.Name+": " {
+					// 如果消息以"规则名: "开头，则去掉这部分
+					message = message[len(rule.Name)+2:]
+				}
+				failedChecks = append(failedChecks, fmt.Sprintf("  [FAIL] %s: %s", rule.Name, message))
+			}
+		}
+
+		// 输出结果
+		if hasIssues {
+			fmt.Printf("\nDeployment %s/%s 检查问题:\n", dep.Namespace, dep.Name)
+			for _, check := range failedChecks {
+				fmt.Println(check)
+			}
+		} else {
+			fmt.Printf("Deployment %s/%s: 所有检查通过\n", dep.Namespace, dep.Name)
 		}
 	}
 	return nil

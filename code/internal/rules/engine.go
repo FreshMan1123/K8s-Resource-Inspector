@@ -166,7 +166,20 @@ func (e *Engine) formatResultMessage(rule Rule, passed bool, formattedValue stri
 	case "contains":
 		expectation = fmt.Sprintf("应包含 %s", formattedThreshold)
 	case "has_non_empty":
-		expectation = "应包含指定标签且值不为空"
+		// 对于has_non_empty操作符，提供更具体的错误信息
+		if threshold, ok := rule.Condition.Threshold.(map[string]interface{}); ok {
+			var missingKeys []string
+			for key := range threshold {
+				missingKeys = append(missingKeys, key)
+			}
+			if len(missingKeys) == 1 {
+				expectation = fmt.Sprintf("应包含标签 '%s' 且值不为空", missingKeys[0])
+			} else {
+				expectation = fmt.Sprintf("应包含标签 %v 且值不为空", missingKeys)
+			}
+		} else {
+			expectation = "应包含指定标签且值不为空"
+		}
 	case "matches":
 		expectation = fmt.Sprintf("应匹配正则表达式 %s", formattedThreshold)
 	default:
