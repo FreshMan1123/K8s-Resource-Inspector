@@ -121,7 +121,10 @@ func NewApplyCommand() *cobra.Command {
 
 	// 添加文件标志
 	cmd.Flags().StringP("file", "f", "", "包含资源定义的YAML文件路径")
-	cmd.MarkFlagRequired("file")
+	if err := cmd.MarkFlagRequired("file"); err != nil {
+		fmt.Printf("标记必需标志失败: %v\n", err)
+		os.Exit(1)
+	}
 
 	return cmd
 }

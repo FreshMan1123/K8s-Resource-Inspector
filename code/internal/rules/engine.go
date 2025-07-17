@@ -184,7 +184,7 @@ func (v *NumericValidator) Validate(metric string, actualValue interface{}, cond
 
 	// 获取适用的阈值
 	var thresholdValue interface{}
-	if condition.Thresholds != nil && len(condition.Thresholds) > 0 {
+	if len(condition.Thresholds) > 0 {
 		// 尝试获取环境特定阈值
 		if val, exists := condition.Thresholds[env]; exists {
 			thresholdValue = val
@@ -249,7 +249,7 @@ func (v *StringValidator) Validate(metric string, actualValue interface{}, condi
 
 	// 获取适用的阈值
 	var thresholdValue interface{}
-	if condition.Thresholds != nil && len(condition.Thresholds) > 0 {
+	if len(condition.Thresholds) > 0 {
 		// 尝试获取环境特定阈值
 		if val, exists := condition.Thresholds[env]; exists {
 			thresholdValue = val
@@ -312,7 +312,7 @@ func (v *BooleanValidator) Validate(metric string, actualValue interface{}, cond
 
 	// 获取适用的阈值
 	var thresholdValue interface{}
-	if condition.Thresholds != nil && len(condition.Thresholds) > 0 {
+	if len(condition.Thresholds) > 0 {
 		// 尝试获取环境特定阈值
 		if val, exists := condition.Thresholds[env]; exists {
 			thresholdValue = val

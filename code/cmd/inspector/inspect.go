@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/cmd/inspector/inspect"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +24,9 @@ var inspectCmd = &cobra.Command{
 	Long:  `检查Kubernetes集群中的资源状态并生成详细报告，可以检测资源配置问题和潜在风险。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// 默认显示帮助信息
-		cmd.Help()
+		if err := cmd.Help(); err != nil {
+			fmt.Printf("显示帮助信息失败: %v\n", err)
+		}
 	},
 }
 

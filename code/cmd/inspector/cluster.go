@@ -14,7 +14,6 @@ import (
 var (
 	// 集群命令的配置选项
 	clusterConfigPath string
-	clusterContextName string
 	clusterName       string
 )
 
@@ -25,7 +24,9 @@ var clusterCmd = &cobra.Command{
 	Long:  `管理Kubernetes集群连接，包括添加、列出、切换和删除集群配置。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// 默认显示帮助信息
-		cmd.Help()
+		if err := cmd.Help(); err != nil {
+			fmt.Printf("显示帮助信息失败: %v\n", err)
+		}
 	},
 }
 
@@ -180,7 +181,10 @@ func init() {
 	// 添加cluster add命令的标志
 	clusterAddCmd.Flags().StringVarP(&clusterConfigPath, "file", "f", "", "要添加的kubeconfig文件路径")
 	clusterAddCmd.Flags().StringVarP(&clusterName, "name", "n", "", "集群的名称")
-	clusterAddCmd.MarkFlagRequired("name")
+	if err := clusterAddCmd.MarkFlagRequired("name"); err != nil {
+		fmt.Printf("标记必需标志失败: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 // getConfigPath 获取kubeconfig文件路径

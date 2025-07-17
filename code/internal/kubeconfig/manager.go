@@ -2,7 +2,6 @@ package kubeconfig
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -39,7 +38,7 @@ func (m *Manager) SaveKubeconfig(name string, content []byte) error {
 	filePath := filepath.Join(m.ConfigDir, fmt.Sprintf("%s.yaml", name))
 	
 	// 使用安全权限写入文件，只有文件写入者有读写权限
-	if err := ioutil.WriteFile(filePath, content, DefaultPermissions); err != nil {
+	if err := os.WriteFile(filePath, content, DefaultPermissions); err != nil {
 		return fmt.Errorf("保存kubeconfig文件失败: %w", err)
 	}
 	
@@ -57,7 +56,7 @@ func (m *Manager) LoadKubeconfig(name string) ([]byte, error) {
 	}
 	
 	// 读取文件内容
-	content, err := ioutil.ReadFile(filePath)
+	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("读取kubeconfig文件失败: %w", err)
 	}
@@ -70,7 +69,7 @@ func (m *Manager) ListKubeconfigs() ([]string, error) {
 	var configs []string
 	
 	// 读取目录中的所有文件
-	files, err := ioutil.ReadDir(m.ConfigDir)
+	files, err := os.ReadDir(m.ConfigDir)
 	if err != nil {
 		return nil, fmt.Errorf("读取配置目录失败: %w", err)
 	}

@@ -2,7 +2,6 @@ package rules
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"time"
@@ -45,7 +44,7 @@ func (rl *RuleLoader) LoadRules() error {
 	}
 
 	// 读取文件内容
-	data, err := ioutil.ReadFile(rl.rulesFile)
+	data, err := os.ReadFile(rl.rulesFile)
 	if err != nil {
 		return fmt.Errorf("读取规则文件失败: %w", err)
 	}

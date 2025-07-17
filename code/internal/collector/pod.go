@@ -303,11 +303,6 @@ func convertContainers(pod *corev1.Pod, containerStatuses []corev1.ContainerStat
 	return containers
 }
 
-// int64Ptr 返回int64指针
-func int64Ptr(i int64) *int64 {
-	return &i
-} 
-
 // getPodPriority 获取Pod优先级
 func getPodPriority(pod *corev1.Pod) int32 {
 	if pod.Spec.Priority != nil {

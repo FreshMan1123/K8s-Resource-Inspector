@@ -72,7 +72,7 @@ func runPodInspect(podName, namespace, kubeconfig, contextName, outputFormat str
 		rulesEngine, err = rules.NewEngine(rulesFile)
 	} else {
 		// 使用默认规则文件
-		defaultRulesPath := filepath.Join("configs", "rules", "pod.yaml")
+		defaultRulesPath := filepath.Join("code", "configs", "rules", "pod.yaml")
 		rulesEngine, err = rules.NewEngine(defaultRulesPath)
 	}
 

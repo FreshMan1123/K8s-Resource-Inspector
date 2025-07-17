@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 
 
 	"github.com/spf13/cobra"
@@ -20,7 +21,9 @@ var resourceCmd = &cobra.Command{
 	Long:  `获取和显示Kubernetes集群中的资源信息。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// 默认显示帮助信息
-		cmd.Help()
+		if err := cmd.Help(); err != nil {
+			fmt.Printf("显示帮助信息失败: %v\n", err)
+		}
 	},
 }
 

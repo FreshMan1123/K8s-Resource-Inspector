@@ -251,9 +251,10 @@ func (c *Client) GetRawPodEvents(ctx context.Context, namespace, name string) ([
 
 // 获取 Pod 日志
 func (c *Client) GetRawPodLogs(ctx context.Context, namespace, name, container string, lines int) ([]string, error) {
+	tailLines := int64(lines)
 	podLogOptions := v1.PodLogOptions{
 		Container: container,
-		TailLines: int64Ptr(int64(lines)),
+		TailLines: &tailLines,
 	}
 	req := c.Clientset.CoreV1().Pods(namespace).GetLogs(name, &podLogOptions)
 	podLogs, err := req.Stream(ctx)
@@ -277,7 +278,3 @@ func (c *Client) GetRawPodLogs(ctx context.Context, namespace, name, container s
 	return logs, nil
 } 
 
-// ======= 保留 int64Ptr 辅助函数，供 GetRawPodLogs 使用 =======
-func int64Ptr(i int64) *int64 {
-	return &i
-} 
