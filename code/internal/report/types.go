@@ -44,9 +44,8 @@ type NodeDetail struct {
 		ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
 		// Kubelet版本
 		KubeletVersion string `json:"kubeletVersion"`
-		// Kube-Proxy版本
-		KubeProxyVersion string `json:"kubeProxyVersion"`
-		// 架构
+		// Kube-Proxy版本已被废弃，不再使用
+		// Architecture
 		Architecture string `json:"architecture"`
 	} `json:"nodeInfo"`
 	

@@ -100,7 +100,7 @@ func (f *TextFormatter) writeNodeDetails(sb *strings.Builder, report *Report) {
 		sb.WriteString(fmt.Sprintf("  操作系统: %s\n", getValueOrDefault(node.NodeInfo.OSImage, "未知")))
 		sb.WriteString(fmt.Sprintf("  容器运行时: %s\n", getValueOrDefault(node.NodeInfo.ContainerRuntimeVersion, "未知")))
 		sb.WriteString(fmt.Sprintf("  Kubelet版本: %s\n", getValueOrDefault(node.NodeInfo.KubeletVersion, "未知")))
-		sb.WriteString(fmt.Sprintf("  Kube-Proxy版本: %s\n", getValueOrDefault(node.NodeInfo.KubeProxyVersion, "未知")))
+		// Kube-Proxy版本已被废弃，不再显示
 		sb.WriteString(fmt.Sprintf("  架构: %s\n", getValueOrDefault(node.NodeInfo.Architecture, "未知")))
 		
 		// 资源信息

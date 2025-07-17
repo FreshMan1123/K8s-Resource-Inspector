@@ -248,7 +248,7 @@ func convertNodeToModel(node *corev1.Node, usage corev1.ResourceList, allocated 
 			OSImage:                 node.Status.NodeInfo.OSImage,
 			ContainerRuntimeVersion: node.Status.NodeInfo.ContainerRuntimeVersion,
 			KubeletVersion:          node.Status.NodeInfo.KubeletVersion,
-			KubeProxyVersion:        node.Status.NodeInfo.KubeProxyVersion,
+			// KubeProxyVersion 已被废弃，不再使用
 			Architecture:            node.Status.NodeInfo.Architecture,
 		},
 	}

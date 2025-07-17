@@ -61,9 +61,8 @@ type NodeInfo struct {
 	ContainerRuntimeVersion string
 	// Kubelet版本
 	KubeletVersion string
-	// Kube-Proxy版本
-	KubeProxyVersion string
-	// 架构
+	// Kube-Proxy版本已被废弃，不再使用
+	// Architecture
 	Architecture string
 }
 

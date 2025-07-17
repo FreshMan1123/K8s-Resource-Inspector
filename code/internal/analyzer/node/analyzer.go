@@ -68,9 +68,8 @@ type AnalysisResult struct {
 		ContainerRuntimeVersion string `json:"container_runtime_version"`
 		// Kubelet版本
 		KubeletVersion string `json:"kubelet_version"`
-		// Kube-Proxy版本
-		KubeProxyVersion string `json:"kube_proxy_version"`
-		// 架构
+		// Kube-Proxy版本已被废弃，不再使用
+		// Architecture
 		Architecture string `json:"architecture"`
 	} `json:"node_info"`
 	
@@ -165,7 +164,7 @@ func (na *NodeAnalyzer) AnalyzeNode(node *models.Node) (*AnalysisResult, error) 
 	result.NodeInfo.OSImage = node.NodeInfo.OSImage
 	result.NodeInfo.ContainerRuntimeVersion = node.NodeInfo.ContainerRuntimeVersion
 	result.NodeInfo.KubeletVersion = node.NodeInfo.KubeletVersion
-	result.NodeInfo.KubeProxyVersion = node.NodeInfo.KubeProxyVersion
+	// KubeProxyVersion 已被废弃，不再使用
 	result.NodeInfo.Architecture = node.NodeInfo.Architecture
 	
 	// 填充资源详细信息

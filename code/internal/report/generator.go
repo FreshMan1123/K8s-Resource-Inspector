@@ -236,7 +236,7 @@ func (g *DefaultGenerator) createNodeDetailFromAnalysisResult(result *node.Analy
 	nodeDetail.NodeInfo.OSImage = result.NodeInfo.OSImage
 	nodeDetail.NodeInfo.ContainerRuntimeVersion = result.NodeInfo.ContainerRuntimeVersion
 	nodeDetail.NodeInfo.KubeletVersion = result.NodeInfo.KubeletVersion
-	nodeDetail.NodeInfo.KubeProxyVersion = result.NodeInfo.KubeProxyVersion
+	// KubeProxyVersion 已被废弃，不再使用
 	nodeDetail.NodeInfo.Architecture = result.NodeInfo.Architecture
 	
 	// 填充资源信息
