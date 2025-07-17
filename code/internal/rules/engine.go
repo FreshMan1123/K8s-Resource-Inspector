@@ -64,6 +64,7 @@ func (e *Engine) registerDefaultValidators() {
 	e.RegisterValidator("string", &StringValidator{})
 	// 注册布尔验证器
 	e.RegisterValidator("boolean", &BooleanValidator{})
+	e.RegisterValidator("map", &MapValidator{}) // 新增
 }
 
 // RegisterValidator 注册验证器
@@ -164,6 +165,10 @@ func (e *Engine) formatResultMessage(rule Rule, passed bool, formattedValue stri
 		expectation = fmt.Sprintf("不应等于 %s", formattedThreshold)
 	case "contains":
 		expectation = fmt.Sprintf("应包含 %s", formattedThreshold)
+	case "has_non_empty":
+		expectation = "应包含指定标签且值不为空"
+	case "matches":
+		expectation = fmt.Sprintf("应匹配正则表达式 %s", formattedThreshold)
 	default:
 		expectation = fmt.Sprintf("不满足条件 %s %s", rule.Condition.Operator, formattedThreshold)
 	}
@@ -353,6 +358,112 @@ func (v *BooleanValidator) FormatValue(value interface{}) string {
 		}
 		return "false"
 	}
+	return fmt.Sprintf("%v", value)
+}
+
+// MapValidator 用于验证map类型的标签
+type MapValidator struct{}
+
+func (v *MapValidator) Validate(metric string, actualValue interface{}, condition RuleCondition, env string) (bool, error) {
+	// 将实际值转换为map[string]string
+	actual, ok := actualValue.(map[string]string)
+	if !ok {
+		return false, fmt.Errorf("actualValue类型断言失败，期望map[string]string，实际类型：%T", actualValue)
+	}
+
+	// 获取适用的阈值（与其他验证器保持一致）
+	var thresholdValue interface{}
+	if len(condition.Thresholds) > 0 {
+		if val, exists := condition.Thresholds[env]; exists {
+			thresholdValue = val
+		} else if val, exists := condition.Thresholds["default"]; exists {
+			thresholdValue = val
+		} else {
+			thresholdValue = condition.Threshold
+		}
+	} else {
+		thresholdValue = condition.Threshold
+	}
+
+	// 转换threshold为map[string]string
+	expected, err := v.convertToStringMap(thresholdValue)
+	if err != nil {
+		return false, fmt.Errorf("threshold类型转换失败: %w", err)
+	}
+
+	// 根据操作符执行不同的验证逻辑
+	switch condition.Operator {
+	case "==":
+		return v.validateEquals(actual, expected), nil
+	case "contains":
+		return v.validateContains(actual, expected), nil
+	case "has_non_empty":
+		return v.validateHasNonEmpty(actual, expected), nil
+	default:
+		return false, fmt.Errorf("map类型不支持的操作符: %s", condition.Operator)
+	}
+}
+
+// validateEquals 验证map完全相等
+func (v *MapValidator) validateEquals(actual, expected map[string]string) bool {
+	for k, v := range expected {
+		if actualVal, exists := actual[k]; !exists || actualVal != v {
+			return false
+		}
+	}
+	return true
+}
+
+// validateContains 验证map包含指定的键值对
+func (v *MapValidator) validateContains(actual, expected map[string]string) bool {
+	for k, v := range expected {
+		if actualVal, exists := actual[k]; !exists || actualVal != v {
+			return false
+		}
+	}
+	return true
+}
+
+// validateHasNonEmpty 验证map包含指定的键且值不为空
+func (v *MapValidator) validateHasNonEmpty(actual, expected map[string]string) bool {
+	for k := range expected {
+		actualVal, exists := actual[k]
+		if !exists {
+			return false
+		}
+		// 检查值是否为空（空字符串或纯空格）
+		if strings.TrimSpace(actualVal) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+// convertToStringMap 将不同类型的map转换为map[string]string
+func (v *MapValidator) convertToStringMap(value interface{}) (map[string]string, error) {
+	switch v := value.(type) {
+	case map[string]string:
+		return v, nil
+	case map[string]interface{}:
+		result := make(map[string]string)
+		for k, val := range v {
+			result[k] = fmt.Sprintf("%v", val)
+		}
+		return result, nil
+	case map[interface{}]interface{}:
+		result := make(map[string]string)
+		for k, val := range v {
+			keyStr := fmt.Sprintf("%v", k)
+			valStr := fmt.Sprintf("%v", val)
+			result[keyStr] = valStr
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("不支持的threshold类型: %T", value)
+	}
+}
+
+func (v *MapValidator) FormatValue(value interface{}) string {
 	return fmt.Sprintf("%v", value)
 }
 

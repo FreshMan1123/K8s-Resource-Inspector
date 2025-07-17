@@ -22,7 +22,7 @@ import (
 // Client 表示Kubernetes集群客户端
 type Client struct {
 	// Clientset 是与Kubernetes API交互的客户端
-	Clientset *kubernetes.Clientset
+	Clientset kubernetes.Interface
 	// ConfigPath 是使用的kubeconfig文件路径
 	ConfigPath string
 	// ContextName 是使用的kubeconfig上下文名称
@@ -78,7 +78,7 @@ func NewClient(configPath string, contextName string) (*Client, error) {
 	}
 
 	return &Client{
-		Clientset: clientset,
+		Clientset: clientset, // *kubernetes.Clientset 实现了 kubernetes.Interface
 		ConfigPath: configPath,
 		ContextName: contextName,
 		MetricsClient: metricsClient,
@@ -277,7 +277,7 @@ func (c *Client) GetRawPodLogs(ctx context.Context, namespace, name, container s
 		logs = logs[:len(logs)-1]
 	}
 	return logs, nil
-} 
+}
 
 // 获取所有 Deployment 原生对象
 func (c *Client) ListRawDeployments(ctx context.Context, namespace string) ([]appsv1.Deployment, error) {

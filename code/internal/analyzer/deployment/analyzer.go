@@ -50,4 +50,18 @@ func AllContainersImagePullPolicy(deployment models.Deployment, policy string) b
 		}
 	}
 	return true
+}
+
+// 获取所有容器的统一ImagePullPolicy（如不一致则返回Mixed）
+func GetImagePullPolicy(deployment models.Deployment) string {
+	if len(deployment.Containers) == 0 {
+		return ""
+	}
+	policy := deployment.Containers[0].ImagePullPolicy
+	for _, c := range deployment.Containers[1:] {
+		if c.ImagePullPolicy != policy {
+			return "Mixed"
+		}
+	}
+	return policy
 } 

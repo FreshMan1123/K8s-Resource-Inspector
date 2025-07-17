@@ -79,21 +79,24 @@ func runDeploymentInspect() error {
 	for _, dep := range deployments {
 		for _, rule := range rulesList {
 			var actualValue interface{}
+			var metricType string
 			switch rule.Condition.Metric {
 			case "replicas":
 				actualValue = dep.Replicas
+				metricType = "numeric"
 			case "has_resource_limits":
 				actualValue = deployment.AllContainersHaveResourceLimits(dep)
+				metricType = "boolean"
 			case "image_pull_policy":
-				th, _ := rule.Condition.Threshold.(string)
-				actualValue = deployment.AllContainersImagePullPolicy(dep, th)
+				actualValue = deployment.GetImagePullPolicy(dep)
+				metricType = "string"
 			case "has_labels":
-				th, _ := rule.Condition.Threshold.(map[string]string)
-				actualValue = deployment.HasLabels(dep, th)
+				actualValue = dep.Labels
+				metricType = "map"
 			default:
 				continue
 			}
-			result, err := rulesEngine.EvaluateRule(rule, rule.Condition.Metric, actualValue)
+			result, err := rulesEngine.EvaluateRule(rule, metricType, actualValue)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "规则评估失败: %v\n", err)
 				continue

@@ -12,6 +12,7 @@ K8s-Resource-Inspector 是一个专注于 Kubernetes 资源配置审计、合规
 - **资源优化**：识别资源浪费和提供优化建议
 - **灵活报告**：支持多种报告格式和输出方式
 - **自动化集成**：支持与 CI/CD 流程集成，实现自动化巡检
+- **Deployment/POD/Node等多资源类型巡检**：支持节点、Pod、Deployment等多种K8s资源的合规性检查
 
 ## 安装与使用
 
@@ -41,7 +42,7 @@ cd k8s-resource-inspector/code
 go build -o inspector cmd/inspector/main.go
 ```
 
-#### 方法3: 使用Docker镜像
+#### 方法3: 使用Docker镜像(镜像暂时还没实现)
 
 ```bash
 docker pull freshman1123/k8s-resource-inspector:latest
@@ -81,6 +82,89 @@ inspector resource get deployments -n kube-system
 
 # 列出命名空间
 inspector resource namespace list
+```
+
+#### Deployment 资源巡检
+
+K8s-Resource-Inspector 支持对 Deployment 资源的配置合规性巡检，包括副本数、资源限制、镜像拉取策略、标签等多项规则。
+
+**命令行用法：**
+
+```bash
+# 检查所有命名空间下的Deployment
+inspector inspect deployment
+
+# 使用自定义规则文件
+inspector inspect deployment --rules-file code/configs/rules/deployment.yaml
+
+# 只显示有问题的Deployment
+inspector inspect deployment --only-issues
+
+# 输出为JSON格式并保存到文件
+inspector inspect deployment --output json --output-file deployment-report.json
+```
+
+**典型输出示例：**
+```
+Deployment: default/test-dep
+[PASS] 副本数不少于2
+[FAIL] 必须设置资源限制
+[PASS] 镜像拉取策略必须为IfNotPresent
+[FAIL] 必须包含指定标签
+...
+```
+
+#### 规则配置示例（deployment.yaml）
+
+```yaml
+apiVersion: inspector.k8s/v1
+kind: RulesConfig
+rules:
+  - id: "min_replicas"
+    name: "副本数不少于2"
+    category: "deployment"
+    severity: "warning"
+    condition:
+      metric: "replicas"
+      operator: ">="
+      threshold: 2
+    remediation: "建议将副本数设置为2及以上，提升高可用性"
+    enabled: true
+
+  - id: "require_resource_limits"
+    name: "必须设置资源限制"
+    category: "deployment"
+    severity: "error"
+    condition:
+      metric: "has_resource_limits"
+      operator: "=="
+      threshold: true
+    remediation: "所有容器都应设置CPU和内存限制"
+    enabled: true
+
+  - id: "require_image_pull_policy"
+    name: "镜像拉取策略必须为IfNotPresent"
+    category: "deployment"
+    severity: "warning"
+    condition:
+      metric: "image_pull_policy"
+      operator: "=="
+      threshold: "IfNotPresent"
+    remediation: "建议将所有容器的imagePullPolicy设置为IfNotPresent，避免频繁拉取镜像"
+    enabled: true
+
+  - id: "require_labels"
+    name: "必须包含指定标签"
+    category: "deployment"
+    severity: "error"
+    condition:
+      metric: "has_labels"
+      operator: "=="
+      threshold:
+        app: web
+        env: prod
+    remediation: "Deployment 必须包含 app=web 且 env=prod 标签"
+    enabled: true
 ```
 
 #### 资源巡检

@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/collector"
@@ -69,7 +70,6 @@ func TestDeploymentCollectorWithFakeClient(t *testing.T) {
 	}
 }
 
-func resourceQuantity(val string) corev1.ResourceQuantity {
-	q, _ := corev1.ParseQuantity(val)
-	return q
+func resourceQuantity(val string) resource.Quantity {
+	return resource.MustParse(val)
 } 

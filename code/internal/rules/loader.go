@@ -203,13 +203,15 @@ func validateConfig(config *RulesConfig) error {
 // isValidOperator 检查操作符是否有效
 func isValidOperator(op string) bool {
 	validOps := map[string]bool{
-		">":        true,
-		">=":       true,
-		"<":        true,
-		"<=":       true,
-		"==":       true,
-		"!=":       true,
-		"contains": true,
+		">":            true,
+		">=":           true,
+		"<":            true,
+		"<=":           true,
+		"==":           true,
+		"!=":           true,
+		"contains":     true,
+		"matches":      true,
+		"has_non_empty": true,
 	}
 	return validOps[op]
-} 
+}

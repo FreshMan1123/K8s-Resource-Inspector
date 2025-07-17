@@ -1,6 +1,14 @@
 apiVersion: inspector.k8s/v1
 kind: RulesConfig
 
+config:
+  autoReload: false
+  reloadInterval: "5m"
+  environment: "test"
+
+clusterEnvironments:
+  test-cluster: "test"
+
 rules:
   - id: "min_replicas"
     name: "副本数不少于2"
