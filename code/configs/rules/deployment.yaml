@@ -1,0 +1,49 @@
+apiVersion: inspector.k8s/v1
+kind: RulesConfig
+
+rules:
+  - id: "min_replicas"
+    name: "副本数不少于2"
+    category: "deployment"
+    severity: "warning"
+    condition:
+      metric: "replicas"
+      operator: ">="
+      threshold: 2
+    remediation: "建议将副本数设置为2及以上，提升高可用性"
+    enabled: true
+
+  - id: "require_resource_limits"
+    name: "必须设置资源限制"
+    category: "deployment"
+    severity: "error"
+    condition:
+      metric: "has_resource_limits"
+      operator: "=="
+      threshold: true
+    remediation: "所有容器都应设置CPU和内存限制"
+    enabled: true
+
+  - id: "require_image_pull_policy"
+    name: "镜像拉取策略必须为IfNotPresent"
+    category: "deployment"
+    severity: "warning"
+    condition:
+      metric: "image_pull_policy"
+      operator: "=="
+      threshold: "IfNotPresent"
+    remediation: "建议将所有容器的imagePullPolicy设置为IfNotPresent，避免频繁拉取镜像"
+    enabled: true
+
+  - id: "require_labels"
+    name: "必须包含指定标签"
+    category: "deployment"
+    severity: "error"
+    condition:
+      metric: "has_labels"
+      operator: "=="
+      threshold:
+        app: web
+        env: prod
+    remediation: "Deployment 必须包含 app=web 且 env=prod 标签"
+    enabled: true 

@@ -11,7 +11,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
 
 	"k8s.io/metrics/pkg/client/clientset/versioned"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -276,5 +277,14 @@ func (c *Client) GetRawPodLogs(ctx context.Context, namespace, name, container s
 		logs = logs[:len(logs)-1]
 	}
 	return logs, nil
+} 
+
+// 获取所有 Deployment 原生对象
+func (c *Client) ListRawDeployments(ctx context.Context, namespace string) ([]appsv1.Deployment, error) {
+	deployments, err := c.Clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return deployments.Items, nil
 } 
 
