@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/fatih/color"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/deployment"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/collector"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
@@ -18,12 +19,43 @@ var (
 	depKubeconfig   *string
 	depContextName  *string
 	depRulesFile    *string
+	depNoColor      *bool
 )
 
-func NewDeploymentCommand(kubecfg, ctx *string, rFile *string) *cobra.Command {
+// 颜色对象
+var (
+	redColor    = color.New(color.FgRed, color.Bold)
+	greenColor  = color.New(color.FgGreen, color.Bold)
+	yellowColor = color.New(color.FgYellow, color.Bold)
+)
+
+// 颜色工具函数
+func coloredFail(text string) string {
+	if depNoColor != nil && *depNoColor {
+		return text
+	}
+	return redColor.Sprint(text)
+}
+
+func coloredSuccess(text string) string {
+	if depNoColor != nil && *depNoColor {
+		return text
+	}
+	return greenColor.Sprint(text)
+}
+
+func coloredWarning(text string) string {
+	if depNoColor != nil && *depNoColor {
+		return text
+	}
+	return yellowColor.Sprint(text)
+}
+
+func NewDeploymentCommand(kubecfg, ctx *string, rFile *string, noColor *bool) *cobra.Command {
 	depKubeconfig = kubecfg
 	depContextName = ctx
 	depRulesFile = rFile
+	depNoColor = noColor
 
 	cmd := &cobra.Command{
 		Use:   "deployment",
@@ -108,7 +140,7 @@ func runDeploymentInspect() error {
 					// 如果消息以"规则名: "开头，则去掉这部分
 					message = message[len(rule.Name)+2:]
 				}
-				failedChecks = append(failedChecks, fmt.Sprintf("  [FAIL] %s: %s", rule.Name, message))
+				failedChecks = append(failedChecks, fmt.Sprintf("  %s %s: %s", coloredFail("[FAIL]"), rule.Name, message))
 			}
 		}
 
@@ -119,7 +151,7 @@ func runDeploymentInspect() error {
 				fmt.Println(check)
 			}
 		} else {
-			fmt.Printf("Deployment %s/%s: 所有检查通过\n", dep.Namespace, dep.Name)
+			fmt.Printf("Deployment %s/%s: %s\n", dep.Namespace, dep.Name, coloredSuccess("所有检查通过"))
 		}
 	}
 	return nil

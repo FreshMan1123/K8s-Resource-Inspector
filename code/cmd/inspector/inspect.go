@@ -67,6 +67,7 @@ func init() {
 		&inspectKubeconfig,
 		&inspectContextName,
 		&inspectRulesFile,
+		&inspectNoColor,
 	))
 	
 	// 添加inspect命令到根命令
