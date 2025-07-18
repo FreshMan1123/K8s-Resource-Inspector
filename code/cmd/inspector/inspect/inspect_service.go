@@ -124,28 +124,28 @@ func runServiceInspect() error {
 				
 				switch rule.Condition.Metric {
 				case "is_loadbalancer_type":
-					actualValue = analyzer.IsLoadBalancerType(svc)
+					actualValue = analyzer.IsLoadBalancerType(&svc)
 					metricType = "boolean"
 				case "is_nodeport_type":
-					actualValue = analyzer.IsNodePortType(svc)
+					actualValue = analyzer.IsNodePortType(&svc)
 					metricType = "boolean"
 				case "min_port":
-					actualValue = analyzer.GetMinPort(svc)
+					actualValue = analyzer.GetMinPort(&svc)
 					metricType = "numeric"
 				case "has_sensitive_annotations":
-					actualValue = analyzer.HasSensitiveAnnotations(svc)
+					actualValue = analyzer.HasSensitiveAnnotations(&svc)
 					metricType = "boolean"
 				case "has_ready_endpoints":
-					actualValue = analyzer.HasReadyEndpoints(svc)
+					actualValue = analyzer.HasReadyEndpoints(&svc)
 					metricType = "boolean"
 				case "has_matching_pods":
-					actualValue = analyzer.HasMatchingPods(svc)
+					actualValue = analyzer.HasMatchingPods(&svc)
 					metricType = "boolean"
 				case "has_labels":
 					actualValue = svc.Labels
 					metricType = "map"
 				case "has_selector":
-					actualValue = analyzer.HasSelector(svc)
+					actualValue = analyzer.HasSelector(&svc)
 					metricType = "boolean"
 				default:
 					continue
