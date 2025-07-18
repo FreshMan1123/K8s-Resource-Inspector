@@ -1,0 +1,106 @@
+apiVersion: inspector.k8s/v1
+kind: RulesConfig
+
+config:
+  autoReload: false
+  reloadInterval: "5m"
+  environment: "prod"
+
+clusterEnvironments:
+  default-cluster: "prod"
+
+rules:
+  # 安全相关规则
+
+  - id: "loadbalancer_security_risk"
+    name: "LoadBalancer类型安全风险检查"
+    category: "service"
+    severity: "warning"
+    condition:
+      metric: "is_loadbalancer_type"
+      operator: "=="
+      threshold: false
+    remediation: "LoadBalancer 类型会将服务暴露到公网，存在安全风险。如果不需要公网访问，建议使用 ClusterIP 类型"
+    enabled: true
+
+  - id: "nodeport_security_risk"
+    name: "NodePort类型安全风险检查"
+    category: "service"
+    severity: "warning"
+    condition:
+      metric: "is_nodeport_type"
+      operator: "=="
+      threshold: false
+    remediation: "NodePort 类型会在所有节点上开放端口，存在安全风险。建议使用 ClusterIP + Ingress 方式"
+    enabled: true
+
+  - id: "avoid_privileged_ports"
+    name: "避免使用特权端口"
+    category: "service"
+    severity: "error"
+    condition:
+      metric: "min_port"
+      operator: ">="
+      threshold: 1024
+    remediation: "避免使用特权端口（< 1024），存在安全风险。建议使用非特权端口"
+    enabled: true
+
+  - id: "sensitive_annotations"
+    name: "敏感信息注解检查"
+    category: "service"
+    severity: "warning"
+    condition:
+      metric: "has_sensitive_annotations"
+      operator: "=="
+      threshold: false
+    remediation: "Service 注解中可能包含敏感信息（如密码、token等），请检查并移除或使用 Secret 管理"
+    enabled: true
+
+  # 连通性相关规则
+
+  - id: "endpoint_availability"
+    name: "服务端点可用性检查"
+    category: "service"
+    severity: "error"
+    condition:
+      metric: "has_ready_endpoints"
+      operator: "=="
+      threshold: true
+    remediation: "服务没有可用的端点，请检查 Pod 状态和 selector 配置是否正确"
+    enabled: true
+
+  - id: "valid_selector"
+    name: "Selector有效性检查"
+    category: "service"
+    severity: "error"
+    condition:
+      metric: "has_matching_pods"
+      operator: "=="
+      threshold: true
+    remediation: "Service selector 没有匹配到任何运行中的 Pod，请检查标签配置"
+    enabled: true
+
+  # 基础配置规则
+
+  - id: "require_owner_label"
+    name: "必须包含owner标签且值不为空"
+    category: "service"
+    severity: "warning"
+    condition:
+      metric: "has_labels"
+      operator: "has_non_empty"
+      threshold:
+        owner: ""
+    remediation: "Service 必须包含 owner 标签且值不能为空，用于标识资源负责人"
+    enabled: true
+
+  - id: "require_selector"
+    name: "Service必须有Selector"
+    category: "service"
+    severity: "warning"
+    condition:
+      metric: "has_selector"
+      operator: "=="
+      threshold: true
+    remediation: "Service 应该有 selector 来选择后端 Pod，除非是 ExternalName 类型"
+    enabled: true

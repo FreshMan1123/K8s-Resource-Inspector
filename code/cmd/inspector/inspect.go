@@ -69,7 +69,15 @@ func init() {
 		&inspectRulesFile,
 		&inspectNoColor,
 	))
-	
+
+	// 添加Service检查命令
+	inspectCmd.AddCommand(inspect.NewServiceCommand(
+		&inspectKubeconfig,
+		&inspectContextName,
+		&inspectRulesFile,
+		&inspectNoColor,
+	))
+
 	// 添加inspect命令到根命令
 	rootCmd.AddCommand(inspectCmd)
 } 

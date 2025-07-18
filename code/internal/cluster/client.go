@@ -286,5 +286,41 @@ func (c *Client) ListRawDeployments(ctx context.Context, namespace string) ([]ap
 		return nil, err
 	}
 	return deployments.Items, nil
-} 
+}
+
+// Service 相关方法
+
+// GetServices 获取指定命名空间的所有 Service
+func (c *Client) GetServices(ctx context.Context, namespace string) (*corev1.ServiceList, error) {
+	return c.Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+}
+
+// GetService 获取指定的 Service
+func (c *Client) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
+	return c.Clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+// GetEndpoints 获取指定的 Endpoints
+func (c *Client) GetEndpoints(ctx context.Context, namespace, name string) (*corev1.Endpoints, error) {
+	return c.Clientset.CoreV1().Endpoints(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+// GetPodsBySelector 根据标签选择器获取 Pod
+func (c *Client) GetPodsBySelector(ctx context.Context, namespace string, selector map[string]string) (*corev1.PodList, error) {
+	labelSelector := metav1.FormatLabelSelector(&metav1.LabelSelector{
+		MatchLabels: selector,
+	})
+	return c.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+}
+
+// ListRawServices 获取所有 Service 原生对象
+func (c *Client) ListRawServices(ctx context.Context, namespace string) ([]corev1.Service, error) {
+	services, err := c.Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return services.Items, nil
+}
 
