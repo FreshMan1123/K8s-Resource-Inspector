@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodeport-service
+  namespace: default
+  labels:
+    owner: team-frontend
+    app: frontend
+spec:
+  type: NodePort  # 安全警告
+  ports:
+  - name: http
+    port: 80      # 特权端口
+    targetPort: 8080
+    nodePort: 30080
+    protocol: TCP
+  - name: https
+    port: 443     # 特权端口
+    targetPort: 8443
+    nodePort: 30443
+    protocol: TCP
+  selector:
+    app: frontend
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: nodeport-service
+  namespace: default
+subsets:
+- addresses:
+  - ip: 10.0.0.3
+  ports:
+  - port: 8080
+    protocol: TCP
+  - port: 8443
+    protocol: TCP
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend-pod-1
+  namespace: default
+  labels:
+    app: frontend
+spec:
+  containers:
+  - name: frontend
+    image: nginx:1.20
+    ports:
+    - containerPort: 8080
+    - containerPort: 8443
+status:
+  phase: Running
+  conditions:
+  - type: Ready
+    status: "True"

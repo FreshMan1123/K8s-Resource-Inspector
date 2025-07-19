@@ -174,3 +174,4 @@ func (c *ServiceCollector) getMatchingPods(ctx context.Context, service *v1.Serv
 
 	return podInfos, nil
 }
+w
