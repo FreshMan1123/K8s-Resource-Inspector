@@ -65,6 +65,12 @@ func (e *Engine) registerDefaultValidators() {
 	// 注册布尔验证器
 	e.RegisterValidator("boolean", &BooleanValidator{})
 	e.RegisterValidator("map", &MapValidator{}) // 新增
+
+	// 注册安全相关验证器
+	e.RegisterValidator("security_context", &SecurityContextValidator{})
+	e.RegisterValidator("image_security", &ImageSecurityValidator{})
+	e.RegisterValidator("network_policy", &NetworkPolicyValidator{})
+	e.RegisterValidator("cis_compliance", &CISComplianceValidator{})
 }
 
 // RegisterValidator 注册验证器
@@ -477,6 +483,617 @@ func (v *MapValidator) convertToStringMap(value interface{}) (map[string]string,
 }
 
 func (v *MapValidator) FormatValue(value interface{}) string {
+	return fmt.Sprintf("%v", value)
+}
+
+// SecurityContextValidator 安全上下文验证器
+type SecurityContextValidator struct{}
+
+// Validate 验证安全上下文配置
+func (v *SecurityContextValidator) Validate(metric string, actualValue interface{}, condition RuleCondition, env string) (bool, error) {
+	// 将实际值转换为map[string]interface{}
+	securityContext, ok := actualValue.(map[string]interface{})
+	if !ok {
+		return false, fmt.Errorf("安全上下文类型断言失败，期望map[string]interface{}，实际类型：%T", actualValue)
+	}
+
+	// 获取适用的阈值
+	var thresholdValue interface{}
+	if len(condition.Thresholds) > 0 {
+		if val, exists := condition.Thresholds[env]; exists {
+			thresholdValue = val
+		} else if val, exists := condition.Thresholds["default"]; exists {
+			thresholdValue = val
+		} else {
+			thresholdValue = condition.Threshold
+		}
+	} else {
+		thresholdValue = condition.Threshold
+	}
+
+	// 根据指标类型进行不同的验证
+	switch metric {
+	case "privileged":
+		return v.validatePrivileged(securityContext, thresholdValue, condition.Operator)
+	case "allow_privilege_escalation":
+		return v.validatePrivilegeEscalation(securityContext, thresholdValue, condition.Operator)
+	case "run_as_non_root":
+		return v.validateRunAsNonRoot(securityContext, thresholdValue, condition.Operator)
+	case "host_network":
+		return v.validateHostNetwork(securityContext, thresholdValue, condition.Operator)
+	case "host_pid_ipc":
+		return v.validateHostPidIpc(securityContext, thresholdValue, condition.Operator)
+	case "read_only_root_filesystem":
+		return v.validateReadOnlyRootFilesystem(securityContext, thresholdValue, condition.Operator)
+	default:
+		return false, fmt.Errorf("不支持的安全上下文指标: %s", metric)
+	}
+}
+
+// validatePrivileged 验证特权容器设置
+func (v *SecurityContextValidator) validatePrivileged(securityContext map[string]interface{}, threshold interface{}, operator string) (bool, error) {
+	privileged, exists := securityContext["privileged"]
+	if !exists {
+		privileged = false // 默认为false
+	}
+
+	privilegedBool, ok := toBool(privileged)
+	if !ok {
+		return false, fmt.Errorf("privileged值类型转换失败: %v", privileged)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("privileged阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return privilegedBool == thresholdBool, nil
+	case "!=":
+		return privilegedBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("privileged不支持的操作符: %s", operator)
+	}
+}
+
+// validatePrivilegeEscalation 验证特权升级设置
+func (v *SecurityContextValidator) validatePrivilegeEscalation(securityContext map[string]interface{}, threshold interface{}, operator string) (bool, error) {
+	allowPrivilegeEscalation, exists := securityContext["allowPrivilegeEscalation"]
+	if !exists {
+		allowPrivilegeEscalation = true // Kubernetes默认为true
+	}
+
+	escalationBool, ok := toBool(allowPrivilegeEscalation)
+	if !ok {
+		return false, fmt.Errorf("allowPrivilegeEscalation值类型转换失败: %v", allowPrivilegeEscalation)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("allowPrivilegeEscalation阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return escalationBool == thresholdBool, nil
+	case "!=":
+		return escalationBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("allowPrivilegeEscalation不支持的操作符: %s", operator)
+	}
+}
+
+// validateRunAsNonRoot 验证非root用户运行设置
+func (v *SecurityContextValidator) validateRunAsNonRoot(securityContext map[string]interface{}, threshold interface{}, operator string) (bool, error) {
+	runAsNonRoot, exists := securityContext["runAsNonRoot"]
+	if !exists {
+		runAsNonRoot = false // 默认为false
+	}
+
+	nonRootBool, ok := toBool(runAsNonRoot)
+	if !ok {
+		return false, fmt.Errorf("runAsNonRoot值类型转换失败: %v", runAsNonRoot)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("runAsNonRoot阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return nonRootBool == thresholdBool, nil
+	case "!=":
+		return nonRootBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("runAsNonRoot不支持的操作符: %s", operator)
+	}
+}
+
+// validateHostNetwork 验证主机网络设置
+func (v *SecurityContextValidator) validateHostNetwork(securityContext map[string]interface{}, threshold interface{}, operator string) (bool, error) {
+	hostNetwork, exists := securityContext["hostNetwork"]
+	if !exists {
+		hostNetwork = false // 默认为false
+	}
+
+	hostNetworkBool, ok := toBool(hostNetwork)
+	if !ok {
+		return false, fmt.Errorf("hostNetwork值类型转换失败: %v", hostNetwork)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("hostNetwork阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return hostNetworkBool == thresholdBool, nil
+	case "!=":
+		return hostNetworkBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("hostNetwork不支持的操作符: %s", operator)
+	}
+}
+
+// validateHostPidIpc 验证主机PID/IPC设置
+func (v *SecurityContextValidator) validateHostPidIpc(securityContext map[string]interface{}, threshold interface{}, operator string) (bool, error) {
+	hostPID, pidExists := securityContext["hostPID"]
+	hostIPC, ipcExists := securityContext["hostIPC"]
+
+	if !pidExists {
+		hostPID = false
+	}
+	if !ipcExists {
+		hostIPC = false
+	}
+
+	hostPIDBool, ok := toBool(hostPID)
+	if !ok {
+		return false, fmt.Errorf("hostPID值类型转换失败: %v", hostPID)
+	}
+
+	hostIPCBool, ok := toBool(hostIPC)
+	if !ok {
+		return false, fmt.Errorf("hostIPC值类型转换失败: %v", hostIPC)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("hostPID/IPC阈值类型转换失败: %v", threshold)
+	}
+
+	// 检查是否有任何一个为true
+	hasHostPidOrIpc := hostPIDBool || hostIPCBool
+
+	switch operator {
+	case "==":
+		return hasHostPidOrIpc == thresholdBool, nil
+	case "!=":
+		return hasHostPidOrIpc != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("hostPID/IPC不支持的操作符: %s", operator)
+	}
+}
+
+// validateReadOnlyRootFilesystem 验证只读根文件系统设置
+func (v *SecurityContextValidator) validateReadOnlyRootFilesystem(securityContext map[string]interface{}, threshold interface{}, operator string) (bool, error) {
+	readOnlyRootFilesystem, exists := securityContext["readOnlyRootFilesystem"]
+	if !exists {
+		readOnlyRootFilesystem = false // 默认为false
+	}
+
+	readOnlyBool, ok := toBool(readOnlyRootFilesystem)
+	if !ok {
+		return false, fmt.Errorf("readOnlyRootFilesystem值类型转换失败: %v", readOnlyRootFilesystem)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("readOnlyRootFilesystem阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return readOnlyBool == thresholdBool, nil
+	case "!=":
+		return readOnlyBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("readOnlyRootFilesystem不支持的操作符: %s", operator)
+	}
+}
+
+// FormatValue 格式化安全上下文值
+func (v *SecurityContextValidator) FormatValue(value interface{}) string {
+	return fmt.Sprintf("%v", value)
+}
+
+// ImageSecurityValidator 镜像安全验证器
+type ImageSecurityValidator struct{}
+
+// Validate 验证镜像安全配置
+func (v *ImageSecurityValidator) Validate(metric string, actualValue interface{}, condition RuleCondition, env string) (bool, error) {
+	// 获取适用的阈值
+	var thresholdValue interface{}
+	if len(condition.Thresholds) > 0 {
+		if val, exists := condition.Thresholds[env]; exists {
+			thresholdValue = val
+		} else if val, exists := condition.Thresholds["default"]; exists {
+			thresholdValue = val
+		} else {
+			thresholdValue = condition.Threshold
+		}
+	} else {
+		thresholdValue = condition.Threshold
+	}
+
+	// 根据指标类型进行不同的验证
+	switch metric {
+	case "image_tag":
+		return v.validateImageTag(actualValue, thresholdValue, condition.Operator)
+	case "image_registry":
+		return v.validateImageRegistry(actualValue, thresholdValue, condition.Operator)
+	case "image_pull_policy":
+		return v.validateImagePullPolicy(actualValue, thresholdValue, condition.Operator)
+	case "image_digest":
+		return v.validateImageDigest(actualValue, thresholdValue, condition.Operator)
+	default:
+		return false, fmt.Errorf("不支持的镜像安全指标: %s", metric)
+	}
+}
+
+// validateImageTag 验证镜像标签
+func (v *ImageSecurityValidator) validateImageTag(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualStr, ok := toString(actualValue)
+	if !ok {
+		return false, fmt.Errorf("镜像标签类型转换失败: %v", actualValue)
+	}
+
+	thresholdStr, ok := toString(threshold)
+	if !ok {
+		return false, fmt.Errorf("镜像标签阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return actualStr == thresholdStr, nil
+	case "!=":
+		return actualStr != thresholdStr, nil
+	case "contains":
+		return strings.Contains(actualStr, thresholdStr), nil
+	case "matches":
+		matched, err := regexp.MatchString(thresholdStr, actualStr)
+		if err != nil {
+			return false, fmt.Errorf("镜像标签正则匹配失败: %v", err)
+		}
+		return matched, nil
+	default:
+		return false, fmt.Errorf("镜像标签不支持的操作符: %s", operator)
+	}
+}
+
+// validateImageRegistry 验证镜像仓库
+func (v *ImageSecurityValidator) validateImageRegistry(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualStr, ok := toString(actualValue)
+	if !ok {
+		return false, fmt.Errorf("镜像仓库类型转换失败: %v", actualValue)
+	}
+
+	switch operator {
+	case "==":
+		thresholdStr, ok := toString(threshold)
+		if !ok {
+			return false, fmt.Errorf("镜像仓库阈值类型转换失败: %v", threshold)
+		}
+		return actualStr == thresholdStr, nil
+	case "!=":
+		thresholdStr, ok := toString(threshold)
+		if !ok {
+			return false, fmt.Errorf("镜像仓库阈值类型转换失败: %v", threshold)
+		}
+		return actualStr != thresholdStr, nil
+	case "contains":
+		thresholdStr, ok := toString(threshold)
+		if !ok {
+			return false, fmt.Errorf("镜像仓库阈值类型转换失败: %v", threshold)
+		}
+		return strings.Contains(actualStr, thresholdStr), nil
+	case "matches":
+		thresholdStr, ok := toString(threshold)
+		if !ok {
+			return false, fmt.Errorf("镜像仓库阈值类型转换失败: %v", threshold)
+		}
+		matched, err := regexp.MatchString(thresholdStr, actualStr)
+		if err != nil {
+			return false, fmt.Errorf("镜像仓库正则匹配失败: %v", err)
+		}
+		return matched, nil
+	case "in":
+		// 支持检查是否在允许的仓库列表中
+		thresholdSlice, ok := threshold.([]interface{})
+		if !ok {
+			return false, fmt.Errorf("镜像仓库阈值应为数组类型: %v", threshold)
+		}
+		for _, item := range thresholdSlice {
+			itemStr, ok := toString(item)
+			if !ok {
+				continue
+			}
+			if strings.Contains(actualStr, itemStr) {
+				return true, nil
+			}
+		}
+		return false, nil
+	default:
+		return false, fmt.Errorf("镜像仓库不支持的操作符: %s", operator)
+	}
+}
+
+// validateImagePullPolicy 验证镜像拉取策略
+func (v *ImageSecurityValidator) validateImagePullPolicy(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualStr, ok := toString(actualValue)
+	if !ok {
+		return false, fmt.Errorf("镜像拉取策略类型转换失败: %v", actualValue)
+	}
+
+	thresholdStr, ok := toString(threshold)
+	if !ok {
+		return false, fmt.Errorf("镜像拉取策略阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return actualStr == thresholdStr, nil
+	case "!=":
+		return actualStr != thresholdStr, nil
+	case "matches":
+		matched, err := regexp.MatchString(thresholdStr, actualStr)
+		if err != nil {
+			return false, fmt.Errorf("镜像拉取策略正则匹配失败: %v", err)
+		}
+		return matched, nil
+	default:
+		return false, fmt.Errorf("镜像拉取策略不支持的操作符: %s", operator)
+	}
+}
+
+// validateImageDigest 验证镜像摘要
+func (v *ImageSecurityValidator) validateImageDigest(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualStr, ok := toString(actualValue)
+	if !ok {
+		return false, fmt.Errorf("镜像摘要类型转换失败: %v", actualValue)
+	}
+
+	switch operator {
+	case "exists":
+		// 检查是否存在摘要（非空）
+		return strings.TrimSpace(actualStr) != "", nil
+	case "not_exists":
+		// 检查是否不存在摘要（为空）
+		return strings.TrimSpace(actualStr) == "", nil
+	case "==":
+		thresholdStr, ok := toString(threshold)
+		if !ok {
+			return false, fmt.Errorf("镜像摘要阈值类型转换失败: %v", threshold)
+		}
+		return actualStr == thresholdStr, nil
+	case "!=":
+		thresholdStr, ok := toString(threshold)
+		if !ok {
+			return false, fmt.Errorf("镜像摘要阈值类型转换失败: %v", threshold)
+		}
+		return actualStr != thresholdStr, nil
+	default:
+		return false, fmt.Errorf("镜像摘要不支持的操作符: %s", operator)
+	}
+}
+
+// FormatValue 格式化镜像安全值
+func (v *ImageSecurityValidator) FormatValue(value interface{}) string {
+	if str, ok := toString(value); ok {
+		return str
+	}
+	return fmt.Sprintf("%v", value)
+}
+
+// NetworkPolicyValidator 网络策略验证器
+type NetworkPolicyValidator struct{}
+
+// Validate 验证网络策略配置
+func (v *NetworkPolicyValidator) Validate(metric string, actualValue interface{}, condition RuleCondition, env string) (bool, error) {
+	// 获取适用的阈值
+	var thresholdValue interface{}
+	if len(condition.Thresholds) > 0 {
+		if val, exists := condition.Thresholds[env]; exists {
+			thresholdValue = val
+		} else if val, exists := condition.Thresholds["default"]; exists {
+			thresholdValue = val
+		} else {
+			thresholdValue = condition.Threshold
+		}
+	} else {
+		thresholdValue = condition.Threshold
+	}
+
+	// 根据指标类型进行不同的验证
+	switch metric {
+	case "has_network_policy":
+		return v.validateHasNetworkPolicy(actualValue, thresholdValue, condition.Operator)
+	case "default_deny":
+		return v.validateDefaultDeny(actualValue, thresholdValue, condition.Operator)
+	default:
+		return false, fmt.Errorf("不支持的网络策略指标: %s", metric)
+	}
+}
+
+// validateHasNetworkPolicy 验证是否存在网络策略
+func (v *NetworkPolicyValidator) validateHasNetworkPolicy(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualBool, ok := toBool(actualValue)
+	if !ok {
+		return false, fmt.Errorf("网络策略存在性类型转换失败: %v", actualValue)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("网络策略存在性阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return actualBool == thresholdBool, nil
+	case "!=":
+		return actualBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("网络策略存在性不支持的操作符: %s", operator)
+	}
+}
+
+// validateDefaultDeny 验证默认拒绝策略
+func (v *NetworkPolicyValidator) validateDefaultDeny(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualBool, ok := toBool(actualValue)
+	if !ok {
+		return false, fmt.Errorf("默认拒绝策略类型转换失败: %v", actualValue)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("默认拒绝策略阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return actualBool == thresholdBool, nil
+	case "!=":
+		return actualBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("默认拒绝策略不支持的操作符: %s", operator)
+	}
+}
+
+// FormatValue 格式化网络策略值
+func (v *NetworkPolicyValidator) FormatValue(value interface{}) string {
+	if b, ok := toBool(value); ok {
+		if b {
+			return "true"
+		}
+		return "false"
+	}
+	return fmt.Sprintf("%v", value)
+}
+
+// CISComplianceValidator CIS合规性验证器
+type CISComplianceValidator struct{}
+
+// Validate 验证CIS合规性
+func (v *CISComplianceValidator) Validate(metric string, actualValue interface{}, condition RuleCondition, env string) (bool, error) {
+	// 获取适用的阈值
+	var thresholdValue interface{}
+	if len(condition.Thresholds) > 0 {
+		if val, exists := condition.Thresholds[env]; exists {
+			thresholdValue = val
+		} else if val, exists := condition.Thresholds["default"]; exists {
+			thresholdValue = val
+		} else {
+			thresholdValue = condition.Threshold
+		}
+	} else {
+		thresholdValue = condition.Threshold
+	}
+
+	// 根据指标类型进行不同的验证
+	switch metric {
+	case "service_account_name":
+		return v.validateServiceAccountName(actualValue, thresholdValue, condition.Operator)
+	case "rbac_wildcard_usage":
+		return v.validateRBACWildcardUsage(actualValue, thresholdValue, condition.Operator)
+	case "automount_service_account_token":
+		return v.validateAutomountServiceAccountToken(actualValue, thresholdValue, condition.Operator)
+	default:
+		return false, fmt.Errorf("不支持的CIS合规性指标: %s", metric)
+	}
+}
+
+// validateServiceAccountName 验证服务账户名称
+func (v *CISComplianceValidator) validateServiceAccountName(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualStr, ok := toString(actualValue)
+	if !ok {
+		return false, fmt.Errorf("服务账户名称类型转换失败: %v", actualValue)
+	}
+
+	thresholdStr, ok := toString(threshold)
+	if !ok {
+		return false, fmt.Errorf("服务账户名称阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return actualStr == thresholdStr, nil
+	case "!=":
+		return actualStr != thresholdStr, nil
+	case "contains":
+		return strings.Contains(actualStr, thresholdStr), nil
+	default:
+		return false, fmt.Errorf("服务账户名称不支持的操作符: %s", operator)
+	}
+}
+
+// validateRBACWildcardUsage 验证RBAC通配符使用
+func (v *CISComplianceValidator) validateRBACWildcardUsage(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualBool, ok := toBool(actualValue)
+	if !ok {
+		return false, fmt.Errorf("RBAC通配符使用类型转换失败: %v", actualValue)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("RBAC通配符使用阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return actualBool == thresholdBool, nil
+	case "!=":
+		return actualBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("RBAC通配符使用不支持的操作符: %s", operator)
+	}
+}
+
+// validateAutomountServiceAccountToken 验证自动挂载服务账户令牌
+func (v *CISComplianceValidator) validateAutomountServiceAccountToken(actualValue, threshold interface{}, operator string) (bool, error) {
+	actualBool, ok := toBool(actualValue)
+	if !ok {
+		return false, fmt.Errorf("自动挂载服务账户令牌类型转换失败: %v", actualValue)
+	}
+
+	thresholdBool, ok := toBool(threshold)
+	if !ok {
+		return false, fmt.Errorf("自动挂载服务账户令牌阈值类型转换失败: %v", threshold)
+	}
+
+	switch operator {
+	case "==":
+		return actualBool == thresholdBool, nil
+	case "!=":
+		return actualBool != thresholdBool, nil
+	default:
+		return false, fmt.Errorf("自动挂载服务账户令牌不支持的操作符: %s", operator)
+	}
+}
+
+// FormatValue 格式化CIS合规性值
+func (v *CISComplianceValidator) FormatValue(value interface{}) string {
+	if str, ok := toString(value); ok {
+		return str
+	}
+	if b, ok := toBool(value); ok {
+		if b {
+			return "true"
+		}
+		return "false"
+	}
 	return fmt.Sprintf("%v", value)
 }
 

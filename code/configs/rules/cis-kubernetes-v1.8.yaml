@@ -1,0 +1,163 @@
+apiVersion: inspector.k8s/v1
+kind: RulesConfig
+metadata:
+  name: "CIS Kubernetes Benchmark v1.8"
+  description: "基于CIS Kubernetes基准v1.8的安全配置检查"
+
+config:
+  autoReload: true
+  reloadInterval: "5m"
+  environment: "prod"
+
+clusterEnvironments:
+  "production-cluster": "prod"
+  "staging-cluster": "staging"
+  "development-cluster": "dev"
+  "default-cluster": "dev"
+
+rules:
+  # CIS 5.1.1 - 确保默认服务账户未被使用
+  - id: "cis-5.1.1"
+    name: "禁止使用默认服务账户"
+    description: "Pod不应使用default服务账户"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "service_account_name"
+      operator: "!="
+      threshold: "default"
+    remediation: "为应用创建专用服务账户并在Pod中指定"
+    enabled: true
+
+  # CIS 5.1.3 - 最小化通配符在RBAC中的使用
+  - id: "cis-5.1.3"
+    name: "限制RBAC通配符使用"
+    description: "RBAC规则不应使用通配符权限"
+    category: "rbac"
+    severity: "critical"
+    condition:
+      metric: "rbac_wildcard_usage"
+      operator: "=="
+      threshold: false
+    remediation: "使用具体的资源和动词权限替代通配符"
+    enabled: true
+
+  # CIS 5.1.5 - 确保默认服务账户令牌未自动挂载
+  - id: "cis-5.1.5"
+    name: "禁用默认服务账户令牌自动挂载"
+    description: "默认服务账户不应自动挂载令牌"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "automount_service_account_token"
+      operator: "=="
+      threshold: false
+    remediation: "设置automountServiceAccountToken为false"
+    enabled: true
+
+  # CIS 5.2.1 - 最小化特权容器的使用
+  - id: "cis-5.2.1"
+    name: "禁止特权容器"
+    description: "容器不应以特权模式运行"
+    category: "pod"
+    severity: "critical"
+    condition:
+      metric: "privileged"
+      operator: "=="
+      threshold: false
+    remediation: "移除securityContext中的privileged: true设置"
+    enabled: true
+
+  # CIS 5.2.2 - 最小化hostNetwork的使用
+  - id: "cis-5.2.2"
+    name: "禁止使用主机网络"
+    description: "Pod不应使用主机网络"
+    category: "pod"
+    severity: "critical"
+    condition:
+      metric: "host_network"
+      operator: "=="
+      threshold: false
+    remediation: "移除Pod规范中的hostNetwork: true设置"
+    enabled: true
+
+  # CIS 5.2.3 - 最小化hostPID和hostIPC的使用
+  - id: "cis-5.2.3"
+    name: "禁止使用主机PID/IPC"
+    description: "Pod不应使用主机PID或IPC命名空间"
+    category: "pod"
+    severity: "critical"
+    condition:
+      metric: "host_pid_ipc"
+      operator: "=="
+      threshold: false
+    remediation: "移除Pod规范中的hostPID和hostIPC设置"
+    enabled: true
+
+  # CIS 5.2.5 - 最小化特权升级的使用
+  - id: "cis-5.2.5"
+    name: "禁止特权升级"
+    description: "容器不应允许特权升级"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "allow_privilege_escalation"
+      operator: "=="
+      threshold: false
+    remediation: "设置securityContext.allowPrivilegeEscalation为false"
+    enabled: true
+
+  # CIS 5.2.6 - 最小化root用户的使用
+  - id: "cis-5.2.6"
+    name: "禁止以root用户运行"
+    description: "容器应以非root用户运行"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "run_as_non_root"
+      operator: "=="
+      threshold: true
+    remediation: "设置securityContext.runAsNonRoot为true"
+    enabled: true
+
+  # CIS 5.3.2 - 最小化NET_RAW能力的使用
+  - id: "cis-5.3.2"
+    name: "禁止NET_RAW能力"
+    description: "容器不应具有NET_RAW能力"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "net_raw_capability"
+      operator: "=="
+      threshold: false
+    remediation: "从容器的capabilities中移除NET_RAW"
+    enabled: true
+
+  # CIS 5.7.3 - 应用安全上下文到Pod和容器
+  - id: "cis-5.7.3"
+    name: "要求安全上下文"
+    description: "Pod和容器应定义安全上下文"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "has_security_context"
+      operator: "=="
+      threshold: true
+    remediation: "为Pod和容器定义适当的securityContext"
+    enabled: true
+
+  # CIS 5.7.4 - 默认不允许特权升级
+  - id: "cis-5.7.4"
+    name: "默认禁止特权升级"
+    description: "默认情况下不应允许特权升级"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "allow_privilege_escalation"
+      operator: "=="
+      thresholds:
+        prod: false
+        staging: false
+        dev: false
+    remediation: "确保allowPrivilegeEscalation默认为false"
+    enabled: true

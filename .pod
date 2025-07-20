@@ -1,0 +1,20 @@
+========================================
+    K8S RESOURCE INSPECTOR REPORT
+========================================
+
+Generated: Sun, 20 Jul 2025 17:53:51 CST
+Cluster:   kind-dev-cluster
+Namespace: default
+
+SUMMARY
+----------------------------------------
+Total resources analyzed:    0
+Resources with issues:       0
+
+Issue severity breakdown:
+[1;31m  CRITICAL[0m 0
+[31m  ERROR   [0m 0
+[33m  WARNING [0m 0
+[36m  INFO    [0m 0
+
+No issues found.

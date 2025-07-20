@@ -3,11 +3,12 @@ package collector
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/cluster"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
-	
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -309,4 +310,271 @@ func getPodPriority(pod *corev1.Pod) int32 {
 		return *pod.Spec.Priority
 	}
 	return 0
-} 
+}
+
+// GetPodSecurityInfo 获取Pod安全信息
+func (pc *PodCollector) GetPodSecurityInfo(ctx context.Context, namespace, name string) (*models.PodSecurityInfo, error) {
+	pod, err := pc.client.GetRawPod(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("获取Pod失败: %w", err)
+	}
+
+	return convertPodToSecurityInfo(pod), nil
+}
+
+// GetPodsSecurityInfo 获取多个Pod的安全信息
+func (pc *PodCollector) GetPodsSecurityInfo(ctx context.Context, namespace string) ([]models.PodSecurityInfo, error) {
+	pods, err := pc.client.ListRawPods(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("获取Pod列表失败: %w", err)
+	}
+
+	securityInfos := make([]models.PodSecurityInfo, 0, len(pods))
+	for _, pod := range pods {
+		securityInfo := convertPodToSecurityInfo(&pod)
+		securityInfos = append(securityInfos, *securityInfo)
+	}
+
+	return securityInfos, nil
+}
+
+// convertPodToSecurityInfo 将Kubernetes Pod转换为安全信息模型
+func convertPodToSecurityInfo(pod *corev1.Pod) *models.PodSecurityInfo {
+	securityInfo := &models.PodSecurityInfo{
+		Name:                         pod.Name,
+		Namespace:                    pod.Namespace,
+		ServiceAccountName:           pod.Spec.ServiceAccountName,
+		AutomountServiceAccountToken: pod.Spec.AutomountServiceAccountToken,
+		HostNetwork:                  pod.Spec.HostNetwork,
+		HostPID:                      pod.Spec.HostPID,
+		HostIPC:                      pod.Spec.HostIPC,
+		Containers:                   make([]models.ContainerSecurityInfo, 0, len(pod.Spec.Containers)),
+		InitContainers:               make([]models.ContainerSecurityInfo, 0, len(pod.Spec.InitContainers)),
+		HostPathMounts:               make([]models.HostPathMount, 0),
+	}
+
+	// 转换Pod安全上下文
+	if pod.Spec.SecurityContext != nil {
+		securityInfo.SecurityContext = convertSecurityContext(pod.Spec.SecurityContext)
+	}
+
+	// 转换容器安全信息
+	for _, container := range pod.Spec.Containers {
+		containerSecurity := convertContainerSecurityInfo(&container)
+		securityInfo.Containers = append(securityInfo.Containers, containerSecurity)
+	}
+
+	// 转换初始化容器安全信息
+	for _, container := range pod.Spec.InitContainers {
+		containerSecurity := convertContainerSecurityInfo(&container)
+		securityInfo.InitContainers = append(securityInfo.InitContainers, containerSecurity)
+	}
+
+	// 检查主机路径挂载
+	for _, volume := range pod.Spec.Volumes {
+		if volume.HostPath != nil {
+			hostPathMount := models.HostPathMount{
+				HostPath:    volume.HostPath.Path,
+				Type:        string(*volume.HostPath.Type),
+				IsSensitive: isSensitiveHostPath(volume.HostPath.Path),
+			}
+
+			// 查找使用此卷的容器挂载点
+			for _, container := range pod.Spec.Containers {
+				for _, mount := range container.VolumeMounts {
+					if mount.Name == volume.Name {
+						hostPathMount.MountPath = mount.MountPath
+						hostPathMount.ReadOnly = mount.ReadOnly
+						break
+					}
+				}
+			}
+
+			securityInfo.HostPathMounts = append(securityInfo.HostPathMounts, hostPathMount)
+		}
+	}
+
+	return securityInfo
+}
+
+// convertSecurityContext 转换安全上下文
+func convertSecurityContext(sc *corev1.PodSecurityContext) *models.SecurityContext {
+	if sc == nil {
+		return nil
+	}
+
+	securityContext := &models.SecurityContext{
+		RunAsNonRoot: sc.RunAsNonRoot,
+		RunAsUser:    sc.RunAsUser,
+		RunAsGroup:   sc.RunAsGroup,
+		FSGroup:      sc.FSGroup,
+	}
+
+	if sc.SELinuxOptions != nil {
+		securityContext.SELinuxOptions = sc.SELinuxOptions
+	}
+
+	if sc.WindowsOptions != nil {
+		securityContext.WindowsOptions = sc.WindowsOptions
+	}
+
+	if sc.SeccompProfile != nil {
+		securityContext.SeccompProfile = sc.SeccompProfile
+	}
+
+	return securityContext
+}
+
+// convertContainerSecurityContext 转换容器安全上下文
+func convertContainerSecurityContext(sc *corev1.SecurityContext) *models.SecurityContext {
+	if sc == nil {
+		return nil
+	}
+
+	securityContext := &models.SecurityContext{
+		Privileged:               sc.Privileged,
+		AllowPrivilegeEscalation: sc.AllowPrivilegeEscalation,
+		RunAsNonRoot:            sc.RunAsNonRoot,
+		RunAsUser:               sc.RunAsUser,
+		RunAsGroup:              sc.RunAsGroup,
+		ReadOnlyRootFilesystem:  sc.ReadOnlyRootFilesystem,
+	}
+
+	if sc.Capabilities != nil {
+		securityContext.Capabilities = &models.SecurityCapabilities{
+			Add:  convertCapabilities(sc.Capabilities.Add),
+			Drop: convertCapabilities(sc.Capabilities.Drop),
+		}
+	}
+
+	if sc.SELinuxOptions != nil {
+		securityContext.SELinuxOptions = sc.SELinuxOptions
+	}
+
+	if sc.WindowsOptions != nil {
+		securityContext.WindowsOptions = sc.WindowsOptions
+	}
+
+	if sc.SeccompProfile != nil {
+		securityContext.SeccompProfile = sc.SeccompProfile
+	}
+
+	return securityContext
+}
+
+// convertCapabilities 转换能力列表
+func convertCapabilities(caps []corev1.Capability) []string {
+	result := make([]string, 0, len(caps))
+	for _, cap := range caps {
+		result = append(result, string(cap))
+	}
+	return result
+}
+
+// convertContainerSecurityInfo 转换容器安全信息
+func convertContainerSecurityInfo(container *corev1.Container) models.ContainerSecurityInfo {
+	containerSecurity := models.ContainerSecurityInfo{
+		Name:             container.Name,
+		Image:            parseImageSecurityInfo(container.Image),
+		ResourceLimits:   convertResourceMap(container.Resources.Limits),
+		ResourceRequests: convertResourceMap(container.Resources.Requests),
+		LivenessProbe:    container.LivenessProbe != nil,
+		ReadinessProbe:   container.ReadinessProbe != nil,
+		StartupProbe:     container.StartupProbe != nil,
+	}
+
+	// 转换容器安全上下文
+	if container.SecurityContext != nil {
+		containerSecurity.SecurityContext = convertContainerSecurityContext(container.SecurityContext)
+	}
+
+	return containerSecurity
+}
+
+// parseImageSecurityInfo 解析镜像安全信息
+func parseImageSecurityInfo(imageStr string) *models.ImageSecurityInfo {
+	imageInfo := &models.ImageSecurityInfo{
+		FullName: imageStr,
+	}
+
+	// 解析镜像名称
+	parts := strings.Split(imageStr, "/")
+	if len(parts) >= 2 {
+		imageInfo.Registry = parts[0]
+		imageInfo.Repository = strings.Join(parts[1:], "/")
+	} else {
+		imageInfo.Registry = "docker.io"
+		imageInfo.Repository = imageStr
+	}
+
+	// 解析标签和摘要
+	if strings.Contains(imageInfo.Repository, "@") {
+		// 包含摘要
+		digestParts := strings.Split(imageInfo.Repository, "@")
+		imageInfo.Repository = digestParts[0]
+		imageInfo.Digest = digestParts[1]
+	} else if strings.Contains(imageInfo.Repository, ":") {
+		// 包含标签
+		tagParts := strings.Split(imageInfo.Repository, ":")
+		imageInfo.Repository = tagParts[0]
+		imageInfo.Tag = tagParts[1]
+	} else {
+		// 默认标签
+		imageInfo.Tag = "latest"
+	}
+
+	// 检查是否使用latest标签
+	imageInfo.IsLatest = imageInfo.Tag == "latest"
+
+	// 检查是否来自可信仓库（示例逻辑）
+	trustedRegistries := []string{
+		"harbor.company.com",
+		"registry.company.com",
+		"gcr.io",
+		"quay.io",
+	}
+
+	for _, trusted := range trustedRegistries {
+		if strings.Contains(imageInfo.Registry, trusted) {
+			imageInfo.IsTrusted = true
+			break
+		}
+	}
+
+	return imageInfo
+}
+
+// convertResourceMap 转换资源映射
+func convertResourceMap(resources corev1.ResourceList) map[string]string {
+	result := make(map[string]string)
+	for name, quantity := range resources {
+		result[string(name)] = quantity.String()
+	}
+	return result
+}
+
+// isSensitiveHostPath 检查是否为敏感主机路径
+func isSensitiveHostPath(path string) bool {
+	sensitivePaths := []string{
+		"/etc",
+		"/var/run/docker.sock",
+		"/var/run/containerd",
+		"/var/lib/docker",
+		"/var/lib/kubelet",
+		"/proc",
+		"/sys",
+		"/dev",
+		"/run",
+		"/boot",
+		"/lib/modules",
+		"/usr/src",
+	}
+
+	for _, sensitive := range sensitivePaths {
+		if strings.HasPrefix(path, sensitive) {
+			return true
+		}
+	}
+
+	return false
+}

@@ -212,6 +212,9 @@ func isValidOperator(op string) bool {
 		"contains":     true,
 		"matches":      true,
 		"has_non_empty": true,
+		"in":           true,
+		"exists":       true,
+		"not_exists":   true,
 	}
 	return validOps[op]
 }

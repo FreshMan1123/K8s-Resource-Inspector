@@ -1,12 +1,14 @@
 package report
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/node"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/analyzer/pod"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
 )
 
@@ -192,6 +194,82 @@ func (g *DefaultGenerator) GeneratePodReport(results []*pod.AnalysisResult, rule
 	// 更新统计信息
 	report.Summary.TotalResources = len(results)
 	report.Summary.ResourcesWithIssues = countResourcesWithIssues(results)
+
+	return report
+}
+
+// GenerateSecurityReport 从安全分析结果创建报告
+func (g *DefaultGenerator) GenerateSecurityReport(results []*models.SecurityAnalysisResult, rulesList []rules.Rule) *Report {
+	report := &Report{
+		Timestamp:   time.Now(),
+		ClusterName: g.ClusterName,
+		Namespace:   g.Namespace,
+		Findings:    make([]Finding, 0),
+		Summary: ReportSummary{
+			FindingCounts: make(map[Severity]int),
+		},
+	}
+
+	// 创建规则映射，方便查找
+	rulesMap := make(map[string]rules.Rule)
+	for _, rule := range rulesList {
+		rulesMap[rule.ID] = rule
+	}
+
+	// 处理每个安全分析结果
+	resourcesWithIssues := make(map[string]bool)
+
+	for _, result := range results {
+		podDisplayName := "pod "
+		if result.Namespace != "" {
+			podDisplayName += result.Namespace + "/" + result.PodName
+		} else {
+			podDisplayName += result.PodName
+		}
+
+		// 处理每个分析项
+		for _, item := range result.Items {
+			if !item.Passed {
+				resourcesWithIssues[podDisplayName] = true
+
+				severity := mapSeverity(item.Severity)
+				report.Summary.FindingCounts[severity]++
+
+				// 构建消息
+				msg := item.Description
+				if item.Metric != "" {
+					msg = fmt.Sprintf("%s (指标: %s)", msg, item.Metric)
+				}
+
+				finding := Finding{
+					ResourceName: podDisplayName,
+					ResourceKind: "Pod",
+					RuleID:       item.RuleID,
+					Message:      msg,
+					Severity:     severity,
+					Recommendation: item.Remediation,
+					Details: map[string]interface{}{
+						"metric":    item.Metric,
+						"value":     item.Value,
+						"threshold": item.Threshold,
+						"namespace": result.Namespace,
+					},
+				}
+
+				// 如果存在，添加规则信息
+				if rule, exists := rulesMap[item.RuleID]; exists {
+					finding.Details["rule_description"] = rule.Description
+					finding.Details["rule_category"] = rule.Category
+				}
+
+				report.Findings = append(report.Findings, finding)
+			}
+		}
+	}
+
+	// 更新统计信息
+	report.Summary.TotalResources = len(results)
+	report.Summary.ResourcesWithIssues = len(resourcesWithIssues)
 
 	return report
 }

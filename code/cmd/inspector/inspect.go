@@ -78,6 +78,17 @@ func init() {
 		&inspectNoColor,
 	))
 
+	// 添加安全检查命令
+	inspectCmd.AddCommand(inspect.NewSecurityCommand(
+		&inspectKubeconfig,
+		&inspectContextName,
+		&inspectOutputFormat,
+		&inspectNoColor,
+		&inspectOnlyIssues,
+		&inspectRulesFile,
+		&inspectOutputFile,
+	))
+
 	// 添加inspect命令到根命令
 	rootCmd.AddCommand(inspectCmd)
 } 

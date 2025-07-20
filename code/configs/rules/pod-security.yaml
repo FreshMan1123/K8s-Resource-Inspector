@@ -1,0 +1,295 @@
+apiVersion: inspector.k8s/v1
+kind: RulesConfig
+metadata:
+  name: "Pod安全策略"
+  description: "Pod和容器安全配置检查规则"
+
+config:
+  autoReload: true
+  reloadInterval: "5m"
+  environment: "prod"
+
+clusterEnvironments:
+  "production-cluster": "prod"
+  "staging-cluster": "staging"
+  "development-cluster": "dev"
+  "default-cluster": "dev"
+
+rules:
+  # 禁止特权容器
+  - id: "pod-sec-001"
+    name: "禁止特权容器"
+    description: "容器不应以特权模式运行"
+    category: "pod"
+    severity: "critical"
+    condition:
+      metric: "privileged"
+      operator: "=="
+      threshold: false
+    remediation: "移除securityContext中的privileged: true设置"
+    enabled: true
+
+  # 禁止特权升级
+  - id: "pod-sec-002"
+    name: "禁止特权升级"
+    description: "容器不应允许特权升级"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "allow_privilege_escalation"
+      operator: "=="
+      threshold: false
+    remediation: "设置securityContext.allowPrivilegeEscalation为false"
+    enabled: true
+
+  # 要求非root用户运行
+  - id: "pod-sec-003"
+    name: "要求非root用户运行"
+    description: "容器应以非root用户运行"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "run_as_non_root"
+      operator: "=="
+      threshold: true
+    remediation: "设置securityContext.runAsNonRoot为true"
+    enabled: true
+
+  # 禁止使用主机网络
+  - id: "pod-sec-004"
+    name: "禁止使用主机网络"
+    description: "Pod不应使用主机网络"
+    category: "pod"
+    severity: "critical"
+    condition:
+      metric: "host_network"
+      operator: "=="
+      threshold: false
+    remediation: "移除Pod规范中的hostNetwork: true设置"
+    enabled: true
+
+  # 禁止使用主机PID
+  - id: "pod-sec-005"
+    name: "禁止使用主机PID"
+    description: "Pod不应使用主机PID命名空间"
+    category: "pod"
+    severity: "critical"
+    condition:
+      metric: "host_pid_ipc"
+      operator: "=="
+      threshold: false
+    remediation: "移除Pod规范中的hostPID设置"
+    enabled: true
+
+  # 要求只读根文件系统
+  - id: "pod-sec-006"
+    name: "推荐只读根文件系统"
+    description: "容器应使用只读根文件系统"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "read_only_root_filesystem"
+      operator: "=="
+      thresholds:
+        prod: true
+        staging: true
+        dev: false
+    remediation: "设置securityContext.readOnlyRootFilesystem为true"
+    enabled: true
+
+  # 要求资源限制
+  - id: "pod-sec-007"
+    name: "要求资源限制"
+    description: "容器应设置CPU和内存限制"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "has_resource_limits"
+      operator: "=="
+      threshold: true
+    remediation: "为容器设置resources.limits.cpu和resources.limits.memory"
+    enabled: true
+
+  # 要求资源请求
+  - id: "pod-sec-008"
+    name: "要求资源请求"
+    description: "容器应设置CPU和内存请求"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "has_resource_requests"
+      operator: "=="
+      threshold: true
+    remediation: "为容器设置resources.requests.cpu和resources.requests.memory"
+    enabled: true
+
+  # 要求存活探针
+  - id: "pod-sec-009"
+    name: "要求存活探针"
+    description: "容器应配置存活探针"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "has_liveness_probe"
+      operator: "=="
+      threshold: true
+    remediation: "为容器配置livenessProbe"
+    enabled: true
+
+  # 要求就绪探针
+  - id: "pod-sec-010"
+    name: "要求就绪探针"
+    description: "容器应配置就绪探针"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "has_readiness_probe"
+      operator: "=="
+      threshold: true
+    remediation: "为容器配置readinessProbe"
+    enabled: true
+
+  # 限制能力
+  - id: "pod-sec-011"
+    name: "限制容器能力"
+    description: "容器应删除不必要的Linux能力"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "drops_all_capabilities"
+      operator: "=="
+      threshold: true
+    remediation: "在securityContext.capabilities.drop中添加ALL"
+    enabled: true
+
+  # 禁止敏感主机路径挂载
+  - id: "pod-sec-012"
+    name: "禁止敏感主机路径挂载"
+    description: "Pod不应挂载敏感的主机路径"
+    category: "pod"
+    severity: "critical"
+    condition:
+      metric: "mounts_sensitive_host_paths"
+      operator: "=="
+      threshold: false
+    remediation: "避免挂载/etc、/var/run/docker.sock等敏感路径"
+    enabled: true
+
+  # 要求安全上下文
+  - id: "pod-sec-013"
+    name: "要求安全上下文"
+    description: "Pod和容器应定义安全上下文"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "has_security_context"
+      operator: "=="
+      threshold: true
+    remediation: "为Pod和容器定义适当的securityContext"
+    enabled: true
+
+  # 禁用服务账户令牌自动挂载
+  - id: "pod-sec-014"
+    name: "控制服务账户令牌挂载"
+    description: "不需要访问API的Pod应禁用服务账户令牌自动挂载"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "automount_service_account_token"
+      operator: "=="
+      threshold: false
+    remediation: "设置automountServiceAccountToken为false"
+    enabled: false  # 默认禁用，需要根据应用需求决定
+
+  # 要求Pod安全标准
+  - id: "pod-sec-015"
+    name: "要求Pod安全标准"
+    description: "Pod应符合Kubernetes Pod安全标准"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "pod_security_standard"
+      operator: "=="
+      thresholds:
+        prod: "restricted"
+        staging: "baseline"
+        dev: "privileged"
+    remediation: "配置Pod以符合相应的安全标准"
+    enabled: false  # 默认禁用，需要Pod安全标准支持
+
+  # 限制系统调用
+  - id: "pod-sec-016"
+    name: "限制系统调用"
+    description: "容器应使用seccomp配置限制系统调用"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "has_seccomp_profile"
+      operator: "=="
+      thresholds:
+        prod: true
+        staging: true
+        dev: false
+    remediation: "配置securityContext.seccompProfile"
+    enabled: false  # 默认禁用，需要seccomp配置
+
+  # 要求AppArmor配置
+  - id: "pod-sec-017"
+    name: "要求AppArmor配置"
+    description: "容器应配置AppArmor安全配置"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "has_apparmor_profile"
+      operator: "=="
+      thresholds:
+        prod: true
+        staging: false
+        dev: false
+    remediation: "通过注解配置AppArmor配置文件"
+    enabled: false  # 默认禁用，需要AppArmor支持
+
+  # 禁止使用hostPort
+  - id: "pod-sec-018"
+    name: "禁止使用hostPort"
+    description: "容器不应使用hostPort"
+    category: "pod"
+    severity: "warning"
+    condition:
+      metric: "uses_host_port"
+      operator: "=="
+      threshold: false
+    remediation: "使用Service而不是hostPort暴露服务"
+    enabled: true
+
+  # 要求网络策略
+  - id: "pod-sec-019"
+    name: "要求网络策略"
+    description: "命名空间应配置网络策略"
+    category: "network"
+    severity: "warning"
+    condition:
+      metric: "has_network_policy"
+      operator: "=="
+      thresholds:
+        prod: true
+        staging: true
+        dev: false
+    remediation: "为命名空间配置适当的NetworkPolicy"
+    enabled: true
+
+  # 限制容器镜像拉取策略
+  - id: "pod-sec-020"
+    name: "限制镜像拉取策略"
+    description: "生产环境应使用Always或IfNotPresent拉取策略"
+    category: "pod"
+    severity: "info"
+    condition:
+      metric: "image_pull_policy"
+      operator: "matches"
+      thresholds:
+        prod: "^(Always|IfNotPresent)$"
+        staging: "^(Always|IfNotPresent|Never)$"
+        dev: ".*"
+    remediation: "设置适当的imagePullPolicy"
+    enabled: true

@@ -1,0 +1,217 @@
+apiVersion: inspector.k8s/v1
+kind: RulesConfig
+metadata:
+  name: "镜像安全策略"
+  description: "容器镜像安全配置检查规则"
+
+config:
+  autoReload: true
+  reloadInterval: "5m"
+  environment: "prod"
+
+clusterEnvironments:
+  "production-cluster": "prod"
+  "staging-cluster": "staging"
+  "development-cluster": "dev"
+  "default-cluster": "dev"
+
+rules:
+  # 禁止使用latest标签
+  - id: "img-sec-001"
+    name: "禁止使用latest镜像标签"
+    description: "容器镜像不应使用latest标签"
+    category: "image"
+    severity: "warning"
+    condition:
+      metric: "image_tag"
+      operator: "!="
+      threshold: "latest"
+    remediation: "使用具体的版本标签，如v1.2.3"
+    enabled: true
+
+  # 要求镜像来源可信
+  - id: "img-sec-002"
+    name: "要求使用可信镜像仓库"
+    description: "镜像必须来自企业批准的仓库"
+    category: "image"
+    severity: "error"
+    condition:
+      metric: "image_registry"
+      operator: "matches"
+      thresholds:
+        prod: "^(harbor\\.company\\.com|registry\\.company\\.com|gcr\\.io|quay\\.io)/"
+        staging: "^(harbor\\.company\\.com|registry\\.company\\.com|docker\\.io|gcr\\.io|quay\\.io)/"
+        dev: ".*"  # 开发环境允许所有仓库
+    remediation: "使用企业内部镜像仓库或批准的公共仓库"
+    enabled: true
+
+  # 要求镜像拉取策略
+  - id: "img-sec-003"
+    name: "镜像拉取策略检查"
+    description: "镜像拉取策略应为IfNotPresent或Always"
+    category: "image"
+    severity: "info"
+    condition:
+      metric: "image_pull_policy"
+      operator: "matches"
+      threshold: "^(IfNotPresent|Always)$"
+    remediation: "设置imagePullPolicy为IfNotPresent或Always"
+    enabled: true
+
+  # 禁止使用空标签
+  - id: "img-sec-004"
+    name: "禁止使用空镜像标签"
+    description: "镜像必须指定标签"
+    category: "image"
+    severity: "error"
+    condition:
+      metric: "image_tag"
+      operator: "!="
+      threshold: ""
+    remediation: "为镜像指定明确的标签"
+    enabled: true
+
+  # 要求镜像摘要
+  - id: "img-sec-005"
+    name: "推荐使用镜像摘要"
+    description: "生产环境建议使用镜像摘要确保不可变性"
+    category: "image"
+    severity: "info"
+    condition:
+      metric: "image_digest"
+      operator: "exists"
+      thresholds:
+        prod: true
+        staging: false
+        dev: false
+    remediation: "使用镜像摘要替代标签，如image@sha256:..."
+    enabled: true
+
+  # 禁止使用不安全的基础镜像
+  - id: "img-sec-006"
+    name: "禁止使用不安全的基础镜像"
+    description: "不应使用已知不安全的基础镜像"
+    category: "image"
+    severity: "critical"
+    condition:
+      metric: "image_registry"
+      operator: "!="
+      threshold: "docker.io/library/ubuntu:14.04"
+    remediation: "使用更新的、安全的基础镜像版本"
+    enabled: true
+
+  # 要求镜像签名验证
+  - id: "img-sec-007"
+    name: "要求镜像签名验证"
+    description: "生产环境镜像应经过数字签名验证"
+    category: "image"
+    severity: "warning"
+    condition:
+      metric: "image_signature"
+      operator: "=="
+      thresholds:
+        prod: true
+        staging: false
+        dev: false
+    remediation: "使用经过数字签名的镜像"
+    enabled: false  # 默认禁用，需要配置签名验证基础设施
+
+  # 禁止使用特定不安全镜像
+  - id: "img-sec-008"
+    name: "禁止使用黑名单镜像"
+    description: "不应使用黑名单中的不安全镜像"
+    category: "image"
+    severity: "critical"
+    condition:
+      metric: "image_registry"
+      operator: "matches"
+      threshold: "^(?!.*(malicious|unsafe|deprecated)).*$"
+    remediation: "使用安全的替代镜像"
+    enabled: true
+
+  # 要求镜像扫描
+  - id: "img-sec-009"
+    name: "要求镜像漏洞扫描"
+    description: "镜像应通过漏洞扫描"
+    category: "image"
+    severity: "warning"
+    condition:
+      metric: "image_scanned"
+      operator: "=="
+      thresholds:
+        prod: true
+        staging: true
+        dev: false
+    remediation: "对镜像进行漏洞扫描并修复高危漏洞"
+    enabled: false  # 默认禁用，需要配置扫描工具
+
+  # 限制镜像大小
+  - id: "img-sec-010"
+    name: "限制镜像大小"
+    description: "镜像大小不应过大"
+    category: "image"
+    severity: "info"
+    condition:
+      metric: "image_size"
+      operator: "<"
+      thresholds:
+        prod: 1073741824    # 1GB
+        staging: 2147483648 # 2GB
+        dev: 5368709120     # 5GB
+    remediation: "优化镜像大小，移除不必要的文件和依赖"
+    enabled: false  # 默认禁用，需要获取镜像大小信息
+
+  # 要求使用多阶段构建
+  - id: "img-sec-011"
+    name: "推荐多阶段构建"
+    description: "推荐使用多阶段构建减少镜像攻击面"
+    category: "image"
+    severity: "info"
+    condition:
+      metric: "multi_stage_build"
+      operator: "=="
+      threshold: true
+    remediation: "使用多阶段构建优化镜像安全性和大小"
+    enabled: false  # 默认禁用，需要分析Dockerfile
+
+  # 禁止使用root用户镜像
+  - id: "img-sec-012"
+    name: "禁止使用root用户镜像"
+    description: "镜像不应默认使用root用户"
+    category: "image"
+    severity: "warning"
+    condition:
+      metric: "image_user"
+      operator: "!="
+      threshold: "root"
+    remediation: "在Dockerfile中使用USER指令指定非root用户"
+    enabled: false  # 默认禁用，需要分析镜像配置
+
+  # 要求镜像标签符合语义化版本
+  - id: "img-sec-013"
+    name: "要求语义化版本标签"
+    description: "镜像标签应符合语义化版本规范"
+    category: "image"
+    severity: "info"
+    condition:
+      metric: "image_tag"
+      operator: "matches"
+      threshold: "^v?\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9]+)?$"
+    remediation: "使用语义化版本标签，如v1.2.3"
+    enabled: false  # 默认禁用，可根据需要启用
+
+  # 禁止使用开发/测试标签在生产环境
+  - id: "img-sec-014"
+    name: "生产环境禁用开发标签"
+    description: "生产环境不应使用开发或测试标签"
+    category: "image"
+    severity: "error"
+    condition:
+      metric: "image_tag"
+      operator: "matches"
+      thresholds:
+        prod: "^(?!.*(dev|test|debug|alpha|beta|rc)).*$"
+        staging: "^(?!.*(dev|debug)).*$"
+        dev: ".*"  # 开发环境允许所有标签
+    remediation: "在生产环境使用稳定版本标签"
+    enabled: true
