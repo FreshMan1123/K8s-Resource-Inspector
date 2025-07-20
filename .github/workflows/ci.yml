@@ -11,6 +11,7 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest     # 使用 Ubuntu 最新云主机作为 runner
+    timeout-minutes: 30        # 设置整个作业30分钟超时
     steps:
       - name: Checkout code    # 步骤1：拉取仓库代码
         uses: actions/checkout@v3
@@ -26,7 +27,7 @@ jobs:
       - name: Lint             # 步骤4：代码静态检查
         run: |
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest # 安装 lint 工具
-          golangci-lint run ./... # 执行 lint 检查
+          golangci-lint run --timeout=10m ./... # 执行 lint 检查，设置10分钟超时
 
       - name: Build (Linux amd64) # 步骤5：交叉编译 Linux 版本
         run: GOOS=linux GOARCH=amd64 go build -o inspector-linux-amd64 ./code/cmd/inspector/
@@ -41,6 +42,7 @@ jobs:
   release:
     needs: build-test          # 依赖 build-test 任务全部通过后才执行
     runs-on: ubuntu-latest
+    timeout-minutes: 20        # 设置整个作业20分钟超时
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') # 仅在打 tag 时执行
     steps:
       - uses: actions/checkout@v3 # 步骤1：拉取代码
