@@ -49,7 +49,7 @@ jobs:
       - name: Set up Go           # 步骤2：安装 Go 环境
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.24'
       - name: Build (Linux amd64) # 步骤3：交叉编译 Linux 版本
         run: GOOS=linux GOARCH=amd64 go build -o inspector-linux-amd64 ./code/cmd/inspector/
       - name: Build (Windows amd64) # 步骤4：交叉编译 Windows 版本
