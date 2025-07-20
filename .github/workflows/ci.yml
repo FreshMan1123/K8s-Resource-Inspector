@@ -38,12 +38,6 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Lint (Linux only)
-        if: matrix.goos == 'linux'
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          golangci-lint run --timeout=10m ./...
-
       - name: Download Trivy for ${{ matrix.goos }} # 步骤名称，${{ matrix.goos }}会被替换为linux或windows
         run: |
           mkdir -p code/internal/scanner/binaries    # 创建存放Trivy二进制文件的目录
@@ -73,6 +67,12 @@ jobs:
 
           echo "✅ Trivy 下载完成"                              # 显示下载完成信息
           ls -la                                              # 列出目录内容，用于调试验证
+
+      - name: Lint (Linux only)                          # Lint检查（在下载Trivy之后）
+        if: matrix.goos == 'linux'                       # 只在Linux任务中执行
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest # 安装lint工具
+          golangci-lint run --timeout=10m ./...          # 执行lint检查，此时binaries目录已存在
 
       - name: Build ${{ matrix.goos }}                    # 构建步骤，名称显示当前构建的平台
         env:                                          # 设置环境变量
