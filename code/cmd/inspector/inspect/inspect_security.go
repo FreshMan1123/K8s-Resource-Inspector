@@ -154,18 +154,12 @@ func runPodSecurityInspect(kubecfg, contextName, outputFormat string, noColor, o
 	// 创建安全分析器
 	securityAnalyzer := analyzer.NewSecurityAnalyzer(podCollector, engine)
 
-	// 获取当前命名空间
-	namespace := "default"
-	if contextName != "" {
-		// 这里可以从context中解析命名空间
-		// 暂时使用default
-	}
-
-	// 执行安全分析
+	// 执行安全分析 - 检查所有命名空间
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	results, err := securityAnalyzer.AnalyzeNamespaceSecurity(ctx, namespace)
+	// 获取所有命名空间的Pod进行安全分析
+	allResults, err := securityAnalyzer.AnalyzeAllNamespacesSecurity(ctx)
 	if err != nil {
 		return fmt.Errorf("安全分析失败: %w", err)
 	}
@@ -184,8 +178,8 @@ func runPodSecurityInspect(kubecfg, contextName, outputFormat string, noColor, o
 			clusterName = currentContext
 		}
 	}
-	reportGenerator := report.NewGenerator(clusterName, namespace)
-	securityReport := reportGenerator.GenerateSecurityReport(results, rulesList)
+	reportGenerator := report.NewGenerator(clusterName, "all-namespaces")
+	securityReport := reportGenerator.GenerateSecurityReport(allResults, rulesList)
 
 	// 创建格式化器
 	var formatter report.Formatter

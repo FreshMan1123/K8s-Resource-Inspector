@@ -68,6 +68,27 @@ func (sa *SecurityAnalyzer) AnalyzeNamespaceSecurity(ctx context.Context, namesp
 	return results, nil
 }
 
+// AnalyzeAllNamespacesSecurity 分析所有命名空间的安全配置
+func (sa *SecurityAnalyzer) AnalyzeAllNamespacesSecurity(ctx context.Context) ([]*models.SecurityAnalysisResult, error) {
+	// 定义要检查的命名空间
+	namespaces := []string{"default", "kube-system", "kube-public", "kube-node-lease"}
+
+	allResults := make([]*models.SecurityAnalysisResult, 0)
+
+	// 分析每个命名空间
+	for _, namespace := range namespaces {
+		results, err := sa.AnalyzeNamespaceSecurity(ctx, namespace)
+		if err != nil {
+			// 记录错误但继续处理其他命名空间
+			fmt.Printf("警告: 分析命名空间 %s 失败: %v\n", namespace, err)
+			continue
+		}
+		allResults = append(allResults, results...)
+	}
+
+	return allResults, nil
+}
+
 // analyzePodSecurityWithRules 使用规则引擎分析Pod安全配置
 func (sa *SecurityAnalyzer) analyzePodSecurityWithRules(podSecurity *models.PodSecurityInfo) []models.SecurityAnalysisItem {
 	items := make([]models.SecurityAnalysisItem, 0)
@@ -75,7 +96,7 @@ func (sa *SecurityAnalyzer) analyzePodSecurityWithRules(podSecurity *models.PodS
 	// 获取安全相关规则
 	enabled := true
 	filter := rules.RuleFilter{
-		Categories: []string{"pod"},
+		Categories: []string{"pod", "image"},
 		Enabled:    &enabled,
 	}
 	securityRules := sa.engine.GetRules(filter)
@@ -100,23 +121,23 @@ func (sa *SecurityAnalyzer) evaluateSecurityRule(rule rules.Rule, podSecurity *m
 	switch rule.Condition.Metric {
 	case "service_account_name":
 		actualValue = podSecurity.ServiceAccountName
-		metricType = "cis_compliance"
+		metricType = "string"
 	case "host_network":
 		actualValue = podSecurity.HostNetwork
-		metricType = "security_context"
+		metricType = "boolean"
 	case "host_pid_ipc":
 		actualValue = podSecurity.HostPID || podSecurity.HostIPC
-		metricType = "security_context"
+		metricType = "boolean"
 	case "automount_service_account_token":
 		if podSecurity.AutomountServiceAccountToken != nil {
 			actualValue = *podSecurity.AutomountServiceAccountToken
 		} else {
 			actualValue = true // Kubernetes默认值
 		}
-		metricType = "cis_compliance"
+		metricType = "boolean"
 	case "mounts_sensitive_host_paths":
 		actualValue = sa.hasSensitiveHostPathMounts(podSecurity.HostPathMounts)
-		metricType = "security_context"
+		metricType = "boolean"
 	default:
 		// 检查容器级别的安全配置
 		return sa.evaluateContainerSecurityRule(rule, podSecurity)
@@ -185,28 +206,28 @@ func (sa *SecurityAnalyzer) evaluateContainerRule(rule rules.Rule, container *mo
 		} else {
 			actualValue = false
 		}
-		metricType = "security_context"
+		metricType = "boolean"
 	case "allow_privilege_escalation":
 		if container.SecurityContext != nil && container.SecurityContext.AllowPrivilegeEscalation != nil {
 			actualValue = *container.SecurityContext.AllowPrivilegeEscalation
 		} else {
 			actualValue = true // Kubernetes默认值
 		}
-		metricType = "security_context"
+		metricType = "boolean"
 	case "run_as_non_root":
 		if container.SecurityContext != nil && container.SecurityContext.RunAsNonRoot != nil {
 			actualValue = *container.SecurityContext.RunAsNonRoot
 		} else {
 			actualValue = false
 		}
-		metricType = "security_context"
+		metricType = "boolean"
 	case "read_only_root_filesystem":
 		if container.SecurityContext != nil && container.SecurityContext.ReadOnlyRootFilesystem != nil {
 			actualValue = *container.SecurityContext.ReadOnlyRootFilesystem
 		} else {
 			actualValue = false
 		}
-		metricType = "security_context"
+		metricType = "boolean"
 	case "image_tag":
 		if container.Image != nil {
 			actualValue = container.Image.Tag

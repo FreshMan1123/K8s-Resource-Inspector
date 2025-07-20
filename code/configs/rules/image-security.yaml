@@ -124,8 +124,8 @@ rules:
     severity: "critical"
     condition:
       metric: "image_registry"
-      operator: "matches"
-      threshold: "^(?!.*(malicious|unsafe|deprecated)).*$"
+      operator: "!="
+      threshold: "malicious"
     remediation: "使用安全的替代镜像"
     enabled: true
 
@@ -210,8 +210,8 @@ rules:
       metric: "image_tag"
       operator: "matches"
       thresholds:
-        prod: "^(?!.*(dev|test|debug|alpha|beta|rc)).*$"
-        staging: "^(?!.*(dev|debug)).*$"
+        prod: "^(v?\\d+\\.\\d+\\.\\d+|stable|release).*$"
+        staging: "^(v?\\d+\\.\\d+\\.\\d+|stable|release|beta|rc).*$"
         dev: ".*"  # 开发环境允许所有标签
     remediation: "在生产环境使用稳定版本标签"
     enabled: true
