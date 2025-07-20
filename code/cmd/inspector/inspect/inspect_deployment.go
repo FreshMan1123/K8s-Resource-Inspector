@@ -26,6 +26,7 @@ var (
 var (
 	redColor    = color.New(color.FgRed, color.Bold)
 	greenColor  = color.New(color.FgGreen, color.Bold)
+	//nolint:unused // 预留给未来的警告输出功能
 	yellowColor = color.New(color.FgYellow, color.Bold)
 )
 
@@ -44,6 +45,7 @@ func coloredSuccess(text string) string {
 	return greenColor.Sprint(text)
 }
 
+//nolint:unused // 预留给未来的警告输出功能
 func coloredWarning(text string) string {
 	if depNoColor != nil && *depNoColor {
 		return text

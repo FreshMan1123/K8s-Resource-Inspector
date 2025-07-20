@@ -301,6 +301,7 @@ func (c *Client) GetService(ctx context.Context, namespace, name string) (*v1.Se
 }
 
 // GetEndpoints 获取指定的 Endpoints
+//nolint:staticcheck // 暂时保留v1.Endpoints，后续版本将迁移到discoveryv1.EndpointSlice
 func (c *Client) GetEndpoints(ctx context.Context, namespace, name string) (*v1.Endpoints, error) {
 	return c.Clientset.CoreV1().Endpoints(namespace).Get(ctx, name, metav1.GetOptions{})
 }

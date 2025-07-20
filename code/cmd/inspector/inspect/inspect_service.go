@@ -26,6 +26,7 @@ var (
 var (
 	svcRedColor    = color.New(color.FgRed, color.Bold)
 	svcGreenColor  = color.New(color.FgGreen, color.Bold)
+	//nolint:unused // 预留给未来的警告输出功能
 	svcYellowColor = color.New(color.FgYellow, color.Bold)
 )
 
@@ -44,6 +45,7 @@ func svcColoredSuccess(text string) string {
 	return svcGreenColor.Sprint(text)
 }
 
+//nolint:unused // 预留给未来的警告输出功能
 func svcColoredWarning(text string) string {
 	if svcNoColor != nil && *svcNoColor {
 		return text
