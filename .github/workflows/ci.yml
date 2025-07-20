@@ -10,55 +10,138 @@ on:
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest     # 使用 Ubuntu 最新云主机作为 runner
-    timeout-minutes: 30        # 设置整个作业30分钟超时
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:                          # GitHub Actions的策略配置
+      matrix:                          # 矩阵构建策略：允许并行运行多个任务变体
+        include:                       # 定义矩阵中包含的具体配置组合
+          - goos: linux                # 第一个构建任务：Linux平台
+            goarch: amd64              # 目标架构：64位AMD/Intel处理器
+            trivy_platform: Linux-64bit # Trivy官方发布包的平台标识
+            trivy_binary: trivy        # 解压后的Trivy二进制文件名（Linux无扩展名）
+            output_name: inspector-linux-amd64 # 最终生成的二进制文件名
+          - goos: windows              # 第二个构建任务：Windows平台
+            goarch: amd64              # 目标架构：64位AMD/Intel处理器
+            trivy_platform: Windows-64bit # Trivy官方发布包的平台标识
+            trivy_binary: trivy.exe    # 解压后的Trivy二进制文件名（Windows有.exe扩展名）
+            output_name: inspector-windows-amd64.exe # 最终生成的二进制文件名
+
     steps:
-      - name: Checkout code    # 步骤1：拉取仓库代码
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Go        # 步骤2：安装 Go 环境
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'  # 指定 Go 版本
+          go-version: '1.24'
 
-      - name: Install dependencies # 步骤3：安装依赖
+      - name: Install dependencies
         run: go mod download
 
-      - name: Lint             # 步骤4：代码静态检查
+      - name: Lint (Linux only)
+        if: matrix.goos == 'linux'
         run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest # 安装 lint 工具
-          golangci-lint run --timeout=10m ./... # 执行 lint 检查，设置10分钟超时
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          golangci-lint run --timeout=10m ./...
 
-      - name: Build (Linux amd64) # 步骤5：交叉编译 Linux 版本
-        run: GOOS=linux GOARCH=amd64 go build -o inspector-linux-amd64 ./code/cmd/inspector/
+      - name: Download Trivy for ${{ matrix.goos }} # 步骤名称，${{ matrix.goos }}会被替换为linux或windows
+        run: |
+          mkdir -p code/internal/scanner/binaries    # 创建存放Trivy二进制文件的目录
+          cd code/internal/scanner/binaries          # 进入该目录
 
-      - name: Build (Windows amd64) # 步骤6：交叉编译 Windows 版本
-        run: GOOS=windows GOARCH=amd64 go build -o inspector-windows-amd64.exe ./code/cmd/inspector/
+          echo "📥 下载 Trivy v0.48.3 for ${{ matrix.goos }}..." # 显示当前下载的平台
 
-      - name: Run unit/component tests (skip integration) # 步骤7：进行测试
+          if [ "${{ matrix.goos }}" = "windows" ]; then          # 判断是否为Windows平台
+            # Windows平台：下载ZIP格式的压缩包
+            wget -q --show-progress "https://github.com/aquasecurity/trivy/releases/download/v0.48.3/trivy_0.48.3_${{ matrix.trivy_platform }}.zip"
+            # 解压ZIP文件，提取指定的二进制文件（trivy.exe）
+            unzip -q "trivy_0.48.3_${{ matrix.trivy_platform }}.zip" "${{ matrix.trivy_binary }}"
+            # 重命名为我们embed代码期望的文件名格式
+            mv "${{ matrix.trivy_binary }}" "trivy-${{ matrix.goos }}-${{ matrix.goarch }}.exe"
+            # 删除下载的压缩包，节省空间
+            rm "trivy_0.48.3_${{ matrix.trivy_platform }}.zip"
+          else                                                   # Linux平台
+            # Linux平台：下载tar.gz格式的压缩包
+            wget -q --show-progress "https://github.com/aquasecurity/trivy/releases/download/v0.48.3/trivy_0.48.3_${{ matrix.trivy_platform }}.tar.gz"
+            # 解压tar.gz文件，提取指定的二进制文件（trivy）
+            tar -xzf "trivy_0.48.3_${{ matrix.trivy_platform }}.tar.gz" "${{ matrix.trivy_binary }}"
+            # 重命名为我们embed代码期望的文件名格式
+            mv "${{ matrix.trivy_binary }}" "trivy-${{ matrix.goos }}-${{ matrix.goarch }}"
+            # 删除下载的压缩包，节省空间
+            rm "trivy_0.48.3_${{ matrix.trivy_platform }}.tar.gz"
+          fi
+
+          echo "✅ Trivy 下载完成"                              # 显示下载完成信息
+          ls -la                                              # 列出目录内容，用于调试验证
+
+      - name: Build ${{ matrix.goos }}                    # 构建步骤，名称显示当前构建的平台
+        env:                                          # 设置环境变量
+          GOOS: ${{ matrix.goos }}                    # Go交叉编译目标操作系统（linux/windows）
+          GOARCH: ${{ matrix.goarch }}                # Go交叉编译目标架构（amd64）
+        run: go build -o ${{ matrix.output_name }} ./code/cmd/inspector/ # 执行Go构建，输出文件名来自matrix配置
+
+      - name: Run tests (Linux only)
+        if: matrix.goos == 'linux'
         run: go test -v -short ./code/test/...
 
 
   release:
-    needs: build-test          # 依赖 build-test 任务全部通过后才执行
+    needs: build-test
     runs-on: ubuntu-latest
-    timeout-minutes: 20        # 设置整个作业20分钟超时
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') # 仅在打 tag 时执行
+    timeout-minutes: 20
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    strategy:                          # GitHub Actions的策略配置（与build-test相同）
+      matrix:                          # 矩阵构建策略：并行发布多个平台版本
+        include:                       # 定义发布的平台配置组合
+          - goos: linux                # 发布Linux版本
+            goarch: amd64              # 64位架构
+            trivy_platform: Linux-64bit # Trivy Linux发布包标识
+            trivy_binary: trivy        # Linux二进制文件名
+            output_name: inspector-linux-amd64 # 发布的文件名
+          - goos: windows              # 发布Windows版本
+            goarch: amd64              # 64位架构
+            trivy_platform: Windows-64bit # Trivy Windows发布包标识
+            trivy_binary: trivy.exe    # Windows二进制文件名（含.exe）
+            output_name: inspector-windows-amd64.exe # 发布的文件名
+
     steps:
-      - uses: actions/checkout@v3 # 步骤1：拉取代码
-      - name: Set up Go           # 步骤2：安装 Go 环境
+      - uses: actions/checkout@v3
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.24'
-      - name: Build (Linux amd64) # 步骤3：交叉编译 Linux 版本
-        run: GOOS=linux GOARCH=amd64 go build -o inspector-linux-amd64 ./code/cmd/inspector/
-      - name: Build (Windows amd64) # 步骤4：交叉编译 Windows 版本
-        run: GOOS=windows GOARCH=amd64 go build -o inspector-windows-amd64.exe ./code/cmd/inspector/
-      - name: Upload Release Assets # 步骤5：上传产物到 GitHub Release
-        uses: softprops/action-gh-release@v1  #这个uses会自动获取我们打的tag以实现上传
-        with:
-          files: |
-            inspector-linux-amd64
-            inspector-windows-amd64.exe
+
+      - name: Download Trivy for ${{ matrix.goos }}
+        run: |
+          mkdir -p code/internal/scanner/binaries
+          cd code/internal/scanner/binaries
+
+          echo "📥 下载 Trivy v0.48.3 for ${{ matrix.goos }}..."
+
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            wget -q --show-progress "https://github.com/aquasecurity/trivy/releases/download/v0.48.3/trivy_0.48.3_${{ matrix.trivy_platform }}.zip"
+            unzip -q "trivy_0.48.3_${{ matrix.trivy_platform }}.zip" "${{ matrix.trivy_binary }}"
+            mv "${{ matrix.trivy_binary }}" "trivy-${{ matrix.goos }}-${{ matrix.goarch }}.exe"
+            rm "trivy_0.48.3_${{ matrix.trivy_platform }}.zip"
+          else
+            wget -q --show-progress "https://github.com/aquasecurity/trivy/releases/download/v0.48.3/trivy_0.48.3_${{ matrix.trivy_platform }}.tar.gz"
+            tar -xzf "trivy_0.48.3_${{ matrix.trivy_platform }}.tar.gz" "${{ matrix.trivy_binary }}"
+            mv "${{ matrix.trivy_binary }}" "trivy-${{ matrix.goos }}-${{ matrix.goarch }}"
+            rm "trivy_0.48.3_${{ matrix.trivy_platform }}.tar.gz"
+          fi
+
+          echo "✅ Trivy 下载完成"
+          ls -la
+
+      - name: Build ${{ matrix.goos }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 用于认证，自动获取，无需手动配置 
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -o ${{ matrix.output_name }} ./code/cmd/inspector/
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.output_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

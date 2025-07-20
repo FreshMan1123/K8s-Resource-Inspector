@@ -7,12 +7,14 @@ import (
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/collector"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/models"
 	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/rules"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/internal/scanner"
 )
 
 // SecurityAnalyzer 安全分析器
 type SecurityAnalyzer struct {
-	podCollector *collector.PodCollector
-	engine       *rules.Engine
+	podCollector         *collector.PodCollector
+	engine              *rules.Engine
+	vulnerabilityScanner scanner.VulnerabilityScanner // 新增漏洞扫描器
 }
 
 // NewSecurityAnalyzer 创建新的安全分析器
@@ -20,6 +22,15 @@ func NewSecurityAnalyzer(podCollector *collector.PodCollector, engine *rules.Eng
 	return &SecurityAnalyzer{
 		podCollector: podCollector,
 		engine:       engine,
+	}
+}
+
+// NewSecurityAnalyzerWithVulnScanner 创建带漏洞扫描器的安全分析器
+func NewSecurityAnalyzerWithVulnScanner(podCollector *collector.PodCollector, engine *rules.Engine, vulnScanner scanner.VulnerabilityScanner) *SecurityAnalyzer {
+	return &SecurityAnalyzer{
+		podCollector:         podCollector,
+		engine:              engine,
+		vulnerabilityScanner: vulnScanner,
 	}
 }
 
@@ -87,6 +98,119 @@ func (sa *SecurityAnalyzer) AnalyzeAllNamespacesSecurity(ctx context.Context) ([
 	}
 
 	return allResults, nil
+}
+
+// AnalyzeWithVulnerabilities 分析安全配置并包含漏洞扫描
+func (sa *SecurityAnalyzer) AnalyzeWithVulnerabilities(ctx context.Context, namespace string) ([]*models.SecurityAnalysisResult, error) {
+	// 先执行常规安全分析
+	results, err := sa.AnalyzeNamespaceSecurity(ctx, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果有漏洞扫描器，执行漏洞扫描
+	if sa.vulnerabilityScanner != nil && sa.vulnerabilityScanner.IsAvailable() {
+		fmt.Printf("🔍 正在执行漏洞扫描...\n")
+
+		vulnReport, err := sa.vulnerabilityScanner.ScanNamespace(ctx, namespace)
+		if err != nil {
+			fmt.Printf("警告: 漏洞扫描失败: %v\n", err)
+		} else {
+			// 将漏洞信息集成到安全分析结果中
+			sa.integrateVulnerabilityResults(results, vulnReport)
+		}
+	}
+
+	return results, nil
+}
+
+// AnalyzeVulnerabilitiesOnly 仅执行漏洞扫描
+func (sa *SecurityAnalyzer) AnalyzeVulnerabilitiesOnly(ctx context.Context, namespace string) (*scanner.VulnerabilityReport, error) {
+	if sa.vulnerabilityScanner == nil {
+		return nil, fmt.Errorf("漏洞扫描器未配置")
+	}
+
+	if !sa.vulnerabilityScanner.IsAvailable() {
+		return nil, fmt.Errorf("漏洞扫描器不可用")
+	}
+
+	return sa.vulnerabilityScanner.ScanNamespace(ctx, namespace)
+}
+
+// integrateVulnerabilityResults 将漏洞扫描结果集成到安全分析结果中
+func (sa *SecurityAnalyzer) integrateVulnerabilityResults(results []*models.SecurityAnalysisResult, vulnReport *scanner.VulnerabilityReport) {
+	// 为每个安全分析结果添加漏洞信息
+	for _, result := range results {
+		// 查找对应的Pod漏洞报告
+		if podVulnReport, exists := vulnReport.PodReports[result.PodName]; exists {
+			// 将漏洞转换为安全分析项
+			vulnItems := sa.convertVulnerabilityToSecurityItems(podVulnReport)
+			result.Items = append(result.Items, vulnItems...)
+		}
+	}
+}
+
+// convertVulnerabilityToSecurityItems 将漏洞报告转换为安全分析项
+func (sa *SecurityAnalyzer) convertVulnerabilityToSecurityItems(podVulnReport *scanner.PodVulnReport) []models.SecurityAnalysisItem {
+	var items []models.SecurityAnalysisItem
+
+	// 检查严重漏洞
+	if podVulnReport.Summary.Critical > 0 {
+		items = append(items, models.SecurityAnalysisItem{
+			RuleID:      "vuln-critical",
+			Metric:      "critical_vulnerabilities",
+			Value:       podVulnReport.Summary.Critical,
+			Threshold:   0,
+			Passed:      false,
+			Severity:    "critical",
+			Description: fmt.Sprintf("发现 %d 个严重漏洞", podVulnReport.Summary.Critical),
+			Remediation: "立即更新镜像到安全版本",
+		})
+	}
+
+	// 检查高危漏洞
+	if podVulnReport.Summary.High > 5 {
+		items = append(items, models.SecurityAnalysisItem{
+			RuleID:      "vuln-high",
+			Metric:      "high_vulnerabilities",
+			Value:       podVulnReport.Summary.High,
+			Threshold:   5,
+			Passed:      false,
+			Severity:    "error",
+			Description: fmt.Sprintf("发现 %d 个高危漏洞 (超过阈值 5)", podVulnReport.Summary.High),
+			Remediation: "尽快更新镜像版本",
+		})
+	}
+
+	// 检查中危漏洞
+	if podVulnReport.Summary.Medium > 10 {
+		items = append(items, models.SecurityAnalysisItem{
+			RuleID:      "vuln-medium",
+			Metric:      "medium_vulnerabilities",
+			Value:       podVulnReport.Summary.Medium,
+			Threshold:   10,
+			Passed:      false,
+			Severity:    "warning",
+			Description: fmt.Sprintf("发现 %d 个中危漏洞 (超过阈值 10)", podVulnReport.Summary.Medium),
+			Remediation: "建议更新镜像版本",
+		})
+	}
+
+	// 检查不可修复的漏洞
+	if podVulnReport.Summary.Unfixable > 0 {
+		items = append(items, models.SecurityAnalysisItem{
+			RuleID:      "vuln-unfixable",
+			Metric:      "unfixable_vulnerabilities",
+			Value:       podVulnReport.Summary.Unfixable,
+			Threshold:   0,
+			Passed:      false,
+			Severity:    "warning",
+			Description: fmt.Sprintf("发现 %d 个不可修复的漏洞", podVulnReport.Summary.Unfixable),
+			Remediation: "考虑使用替代镜像或接受风险",
+		})
+	}
+
+	return items
 }
 
 // analyzePodSecurityWithRules 使用规则引擎分析Pod安全配置

@@ -1,0 +1,47 @@
+{
+  "vulnerable_images": [
+    {
+      "name": "nginx:1.14.0",
+      "description": "已知存在多个高危漏洞的旧版本nginx",
+      "expected_vulnerabilities": "high",
+      "max_scan_time": "3m"
+    },
+    {
+      "name": "ubuntu:16.04",
+      "description": "较旧的Ubuntu版本，可能存在系统级漏洞",
+      "expected_vulnerabilities": "medium",
+      "max_scan_time": "4m"
+    }
+  ],
+  "safe_images": [
+    {
+      "name": "alpine:3.18",
+      "description": "相对安全的最新Alpine镜像",
+      "expected_vulnerabilities": "low",
+      "max_scan_time": "2m"
+    },
+    {
+      "name": "scratch",
+      "description": "空镜像，应该没有漏洞",
+      "expected_vulnerabilities": "none",
+      "max_scan_time": "1m"
+    }
+  ],
+  "error_test_images": [
+    {
+      "name": "",
+      "description": "空镜像名测试",
+      "expected_error": "empty image name"
+    },
+    {
+      "name": "invalid-format",
+      "description": "无效镜像格式测试",
+      "expected_error": "invalid image format"
+    },
+    {
+      "name": "nonexistent-registry.example.com/test:latest",
+      "description": "不存在的镜像测试",
+      "expected_error": "image not found"
+    }
+  ]
+}

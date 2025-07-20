@@ -1,0 +1,26 @@
+{
+  "default_options": {
+    "no_cache": true,
+    "cache_ttl": "1h",
+    "mode": "k8s",
+    "include_config": true,
+    "timeout": "5m",
+    "severity_filter": []
+  },
+  "performance_test_options": {
+    "no_cache": true,
+    "cache_ttl": "30m",
+    "mode": "k8s",
+    "include_config": false,
+    "timeout": "2m",
+    "severity_filter": ["CRITICAL", "HIGH"]
+  },
+  "comprehensive_scan_options": {
+    "no_cache": true,
+    "cache_ttl": "1h",
+    "mode": "k8s",
+    "include_config": true,
+    "timeout": "10m",
+    "severity_filter": []
+  }
+}

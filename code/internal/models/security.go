@@ -239,6 +239,8 @@ type SecurityAnalysisResult struct {
 	Namespace string `json:"namespace"`
 	// 分析项列表
 	Items []SecurityAnalysisItem `json:"items"`
+	// 漏洞报告（可选）
+	VulnerabilityReport interface{} `json:"vulnerabilityReport,omitempty"`
 }
 
 // SecurityAnalysisItem 表示单个安全分析项

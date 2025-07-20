@@ -1,0 +1,1 @@
+{"target":"pod/test-nginx","scanTime":"2025-07-20T20:52:18.452532+08:00","scanner":{"name":"trivy","version":"0.48.3","databaseVersion":""},"podReports":{},"configIssues":[],"summary":{"total":0,"critical":0,"high":0,"medium":0,"low":0,"fixable":0,"unfixable":0,"maxCvss":0,"avgCvss":0},"status":"completed"}

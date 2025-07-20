@@ -89,6 +89,12 @@ func init() {
 		&inspectOutputFile,
 	))
 
+	// 添加漏洞扫描命令
+	inspectCmd.AddCommand(inspect.NewVulnerabilityCommand(
+		&inspectKubeconfig,
+		&inspectContextName,
+	))
+
 	// 添加inspect命令到根命令
 	rootCmd.AddCommand(inspectCmd)
-} 
+}

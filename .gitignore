@@ -49,4 +49,7 @@ dist/
 # Windows
 Thumbs.db
 ehthumbs.db
-Desktop.ini 
+Desktop.ini
+
+# Trivy binaries directory (created and populated by CI/CD)
+code/internal/scanner/binaries/
