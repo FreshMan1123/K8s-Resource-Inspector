@@ -24,8 +24,9 @@ var (
 
 // 颜色对象
 var (
-	redColor   = color.New(color.FgRed, color.Bold)
-	greenColor = color.New(color.FgGreen, color.Bold)
+	redColor    = color.New(color.FgRed, color.Bold)
+	greenColor  = color.New(color.FgGreen, color.Bold)
+	yellowColor = color.New(color.FgYellow, color.Bold)
 )
 
 // 颜色工具函数
