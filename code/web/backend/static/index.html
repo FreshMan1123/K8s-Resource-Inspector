@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K8s巡检管理平台</title>
+    <!-- 通过CDN引入Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 通过CDN引入Element Plus -->
+    <script src="https://unpkg.com/element-plus/dist/index.full.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .main-container {
+            height: 100vh;
+        }
+        .sidebar {
+            background-color: #304156;
+        }
+        .sidebar .el-menu {
+            border-right: none;
+        }
+        .content-area {
+            padding: 20px;
+            background-color: #f0f2f5;
+            overflow-y: auto;
+        }
+        .rule-card {
+            margin-bottom: 16px;
+        }
+        .category-header {
+            margin: 20px 0 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: #409EFF;
+        }
+        .command-output {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .status-running { color: #409EFF; }
+        .status-completed { color: #67C23A; }
+        .status-failed { color: #F56C6C; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-container class="main-container">
+            <!-- 侧边栏 -->
+            <el-aside width="200px" class="sidebar">
+                <div style="padding: 20px; color: white; font-weight: bold; border-bottom: 1px solid #434a50;">
+                    🔍 K8s巡检平台
+                </div>
+                <el-menu
+                    :default-active="activeMenu"
+                    class="el-menu-vertical"
+                    background-color="#304156"
+                    text-color="#bfcbd9"
+                    active-text-color="#409EFF"
+                    @select="handleMenuSelect">
+                    <el-menu-item index="rules">
+                        <span>规则管理</span>
+                    </el-menu-item>
+                    <el-menu-item index="inspection">
+                        <span>巡检执行</span>
+                    </el-menu-item>
+                </el-menu>
+            </el-aside>
+            
+            <!-- 主内容区 -->
+            <el-main class="content-area">
+                <!-- 规则管理页面 -->
+                <div v-if="activeMenu === 'rules'">
+                    <h2>规则管理</h2>
+                    
+                    <!-- 分类统计 -->
+                    <el-row :gutter="20" style="margin-bottom: 20px;">
+                        <el-col :span="4" v-for="category in categories" :key="category.key">
+                            <el-card class="rule-card" @click="selectCategory(category.key)" style="cursor: pointer;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 24px; font-weight: bold; color: #409EFF;">
+                                        {{ category.count }}
+                                    </div>
+                                    <div style="color: #666; font-size: 14px;">
+                                        {{ category.name }}
+                                    </div>
+                                </div>
+                            </el-card>
+                        </el-col>
+                    </el-row>
+                    
+                    <!-- 规则列表 -->
+                    <el-card>
+                        <template #header>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>规则列表</span>
+                                <el-button @click="loadRules">刷新</el-button>
+                            </div>
+                        </template>
+                        
+                        <el-table :data="filteredRules" style="width: 100%;" v-loading="rulesLoading">
+                            <el-table-column prop="id" label="规则ID" width="200"></el-table-column>
+                            <el-table-column prop="name" label="规则名称" width="250"></el-table-column>
+                            <el-table-column prop="category" label="分类" width="120">
+                                <template #default="scope">
+                                    <el-tag>{{ getCategoryName(scope.row.category) }}</el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="监控条件" width="200">
+                                <template #default="scope">
+                                    <div style="font-size: 12px;">
+                                        <div><strong>{{ scope.row.condition.metric }}</strong></div>
+                                        <div>{{ scope.row.condition.operator }} {{ scope.row.condition.threshold }}</div>
+                                    </div>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="severity" label="严重程度" width="100">
+                                <template #default="scope">
+                                    <el-tag :type="getSeverityType(scope.row.severity)">
+                                        {{ getSeverityName(scope.row.severity) }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="enabled" label="状态" width="80">
+                                <template #default="scope">
+                                    <el-tag :type="scope.row.enabled ? 'success' : 'info'">
+                                        {{ scope.row.enabled ? '启用' : '禁用' }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="description" label="描述" show-overflow-tooltip></el-table-column>
+                        </el-table>
+                    </el-card>
+                </div>
+                
+                <!-- 巡检执行页面 -->
+                <div v-if="activeMenu === 'inspection'">
+                    <h2>巡检执行</h2>
+                    
+                    <!-- 快速巡检按钮 -->
+                    <div v-for="category in commandCategories" :key="category">
+                        <div class="category-header">{{ getCategoryDisplayName(category) }}</div>
+                        
+                        <el-row :gutter="20">
+                            <el-col :span="6" v-for="template in getTemplatesByCategory(category)" :key="template.id">
+                                <el-card class="rule-card">
+                                    <template #header>
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span>{{ template.name }}</span>
+                                            <el-button 
+                                                type="primary" 
+                                                size="small" 
+                                                @click="executeCommand(template)"
+                                                :loading="executingCommands[template.id]">
+                                                执行
+                                            </el-button>
+                                        </div>
+                                    </template>
+                                    <div style="color: #666; font-size: 14px;">
+                                        {{ template.description }}
+                                    </div>
+                                </el-card>
+                            </el-col>
+                        </el-row>
+                    </div>
+                    
+                    <!-- 执行结果 -->
+                    <el-card v-if="lastResult" style="margin-top: 20px;">
+                        <template #header>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>执行结果</span>
+                                <div>
+                                    <el-tag :type="lastResult.success ? 'success' : 'danger'">
+                                        {{ lastResult.success ? '成功' : '失败' }}
+                                    </el-tag>
+                                    <span style="margin-left: 10px; color: #666; font-size: 12px;">
+                                        {{ formatTime(lastResult.timestamp) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <div>
+                            <p><strong>命令:</strong> <code>inspector {{ lastResult.command }}</code></p>
+                            <p><strong>执行时长:</strong> {{ formatDuration(lastResult.duration) }}</p>
+                            
+                            <div v-if="lastResult.error" style="margin: 10px 0;">
+                                <el-alert :title="lastResult.error" type="error" show-icon></el-alert>
+                            </div>
+                            
+                            <div style="margin-top: 15px;">
+                                <strong>输出:</strong>
+                                <div class="command-output">{{ lastResult.output }}</div>
+                            </div>
+                        </div>
+                    </el-card>
+                </div>
+            </el-main>
+        </el-container>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    activeMenu: 'rules',
+                    categories: [],
+                    allRules: {},
+                    filteredRules: [],
+                    selectedCategory: 'all',
+                    rulesLoading: false,
+                    
+                    commandTemplates: [],
+                    commandCategories: ['cluster', 'resource', 'inspect'],
+                    executingCommands: {},
+                    lastResult: null
+                }
+            },
+            
+            mounted() {
+                this.loadCategories();
+                this.loadRules();
+                this.loadCommandTemplates();
+            },
+            
+            methods: {
+                // 菜单选择
+                handleMenuSelect(key) {
+                    this.activeMenu = key;
+                },
+                
+                // 加载分类
+                async loadCategories() {
+                    try {
+                        const response = await fetch('/api/categories');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.categories = data.data;
+                        }
+                    } catch (error) {
+                        this.$message.error('加载分类失败');
+                    }
+                },
+                
+                // 加载规则
+                async loadRules() {
+                    this.rulesLoading = true;
+                    try {
+                        const response = await fetch('/api/rules');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.allRules = data.data;
+                            this.filterRules();
+                        }
+                    } catch (error) {
+                        this.$message.error('加载规则失败');
+                    } finally {
+                        this.rulesLoading = false;
+                    }
+                },
+                
+                // 过滤规则
+                filterRules() {
+                    this.filteredRules = [];
+                    for (const [category, rules] of Object.entries(this.allRules)) {
+                        if (this.selectedCategory === 'all' || this.selectedCategory === category) {
+                            this.filteredRules.push(...rules);
+                        }
+                    }
+                },
+                
+                // 选择分类
+                selectCategory(category) {
+                    this.selectedCategory = category;
+                    this.filterRules();
+                },
+                
+                // 加载命令模板
+                async loadCommandTemplates() {
+                    try {
+                        const response = await fetch('/api/inspection/templates');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.commandTemplates = data.data;
+                        }
+                    } catch (error) {
+                        this.$message.error('加载命令模板失败');
+                    }
+                },
+                
+                // 根据分类获取模板
+                getTemplatesByCategory(category) {
+                    return this.commandTemplates.filter(t => t.category === category);
+                },
+                
+                // 执行命令
+                async executeCommand(template) {
+                    this.$set(this.executingCommands, template.id, true);
+                    
+                    try {
+                        const response = await fetch('/api/inspection/execute', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                template_id: template.id,
+                                parameters: {}
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            this.lastResult = data.data;
+                            this.$message.success('命令执行完成');
+                        } else {
+                            throw new Error(data.error);
+                        }
+                    } catch (error) {
+                        this.$message.error('命令执行失败: ' + error.message);
+                    } finally {
+                        this.$set(this.executingCommands, template.id, false);
+                    }
+                },
+                
+                // 工具函数
+                getCategoryName(category) {
+                    const names = {
+                        'node': '节点',
+                        'pod': 'Pod',
+                        'deployment': '部署',
+                        'service': '服务',
+                        'cis-kubernetes-v1.8': 'CIS基准',
+                        'image-security': '镜像安全',
+                        'pod-security': 'Pod安全'
+                    };
+                    return names[category] || category;
+                },
+                
+                getCategoryDisplayName(category) {
+                    const names = {
+                        'cluster': '🏢 集群管理',
+                        'resource': '📦 资源管理',
+                        'inspect': '🔍 资源巡检'
+                    };
+                    return names[category] || category;
+                },
+                
+                getSeverityType(severity) {
+                    const types = { 
+                        'critical': 'danger', 
+                        'warning': 'warning', 
+                        'info': 'info' 
+                    };
+                    return types[severity] || 'info';
+                },
+                
+                getSeverityName(severity) {
+                    const names = {
+                        'critical': '严重',
+                        'warning': '警告',
+                        'info': '信息'
+                    };
+                    return names[severity] || severity;
+                },
+                
+                formatTime(timeStr) {
+                    return new Date(timeStr).toLocaleString();
+                },
+                
+                formatDuration(duration) {
+                    // duration是纳秒，转换为毫秒
+                    const ms = Math.round(duration / 1000000);
+                    if (ms < 1000) {
+                        return ms + 'ms';
+                    } else {
+                        return (ms / 1000).toFixed(2) + 's';
+                    }
+                }
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>
