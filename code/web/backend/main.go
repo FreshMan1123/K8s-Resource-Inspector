@@ -96,7 +96,9 @@ func StartWebServer(port int) {
 	router := webService.SetupRoutes()
 
 	addr := ":" + strconv.Itoa(port)
-	router.Run(addr)
+	if err := router.Run(addr); err != nil {
+		log.Fatalf("启动Web服务器失败: %v", err)
+	}
 }
 
 // 注释掉main函数，因为这个包现在是可导入的
