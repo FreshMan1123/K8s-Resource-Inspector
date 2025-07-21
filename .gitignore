@@ -63,3 +63,32 @@ yarn.lock
 .npm
 .yarn-integrity
 
+# Frontend build outputs
+code/cmd/inspector/web/frontend/dist/
+code/web/backend/static/
+code/cmd/web/backend/static/
+**/static/assets/
+**/static/index.html
+
+# Frontend development files
+code/cmd/inspector/web/frontend/.vite/
+code/cmd/inspector/web/frontend/coverage/
+
+# Go build artifacts
+inspector.exe
+inspector
+inspector-*
+*.exe
+code/inspector.exe
+code/inspector
+
+# Test outputs
+code/test/testdata/
+code/test/coverage.out
+code/test/*.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
