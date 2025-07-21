@@ -50,8 +50,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Trivy binaries directory (created and populated by CI/CD)
+# Trivy binaries directory (created and populated by CI/CD or local download)
 code/internal/scanner/binaries/
+**/binaries/trivy*
 
 # Node.js dependencies and build artifacts
 node_modules/

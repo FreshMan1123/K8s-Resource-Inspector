@@ -236,11 +236,28 @@ func (cs *CommandService) buildCommand(template models.CommandTemplate, params m
 		
 	case "inspect_vulnerability":
 		target := params["scan_target"]
+		if target == "" {
+			// 如果没有指定扫描目标，默认使用 cluster 进行全集群扫描
+			target = "cluster"
+		}
+
 		switch target {
 		case "cluster":
 			command = append(command, "--cluster")
 		case "namespace":
-			command = append(command, "--namespace", "default")
+			if namespace := params["namespace"]; namespace != "" {
+				command = append(command, "--namespace", namespace)
+			} else {
+				command = append(command, "--namespace", "default")
+			}
+		case "pod":
+			if podName := params["pod_name"]; podName != "" {
+				command = append(command, "--pod", podName)
+			}
+		case "image":
+			if imageName := params["image_name"]; imageName != "" {
+				command = append(command, "--image", imageName)
+			}
 		}
 	}
 	
