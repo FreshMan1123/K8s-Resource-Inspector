@@ -115,6 +115,12 @@
           </div>
 
           <div class="status-result" v-if="currentExecution.status !== 'running'">
+            <!-- CLI原始输出显示 -->
+            <div class="command-output" v-if="currentExecution.output">
+              <h4>执行输出：</h4>
+              <pre class="output-content">{{ currentExecution.output }}</pre>
+            </div>
+
             <div v-if="currentExecution.summary" class="result-summary">
               <div class="summary-item">
                 <span class="summary-label">总资源数:</span>
@@ -490,6 +496,52 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   justify-content: center;
+}
+
+/* CLI输出显示样式 */
+.command-output {
+  margin-bottom: 20px;
+}
+
+.command-output h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-color-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.output-content {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 16px;
+  border-radius: 8px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  border: 1px solid var(--border-color);
+  margin: 0;
+}
+
+.output-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.output-content::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 4px;
+}
+
+.output-content::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.output-content::-webkit-scrollbar-thumb:hover {
+  background: #777;
 }
 
 .error-message {

@@ -307,7 +307,7 @@
                 
                 // 执行命令
                 async executeCommand(template) {
-                    this.$set(this.executingCommands, template.id, true);
+                    this.executingCommands[template.id] = true;
                     
                     try {
                         const response = await fetch('/api/inspection/execute', {
@@ -329,7 +329,7 @@
                     } catch (error) {
                         this.$message.error('命令执行失败: ' + error.message);
                     } finally {
-                        this.$set(this.executingCommands, template.id, false);
+                        this.executingCommands[template.id] = false;
                     }
                 },
                 

@@ -52,8 +52,20 @@ export interface InspectionHistory {
 // 巡检API
 export const inspectionApi = {
   // 执行巡检
-  execute(request: InspectionRequest): Promise<InspectionResult> {
-    return request.post('/inspection/execute', request)
+  execute(requestData: InspectionRequest): Promise<InspectionResult> {
+    // 转换为后端期望的格式
+    const backendRequest = {
+      template_id: requestData.type,
+      parameters: {
+        namespace: requestData.namespace || '',
+        pod_name: requestData.podName || '',
+        kubeconfig: requestData.kubeconfig || '',
+        context_name: requestData.contextName || '',
+        only_issues: requestData.onlyIssues ? 'true' : 'false',
+        rules_file: requestData.rulesFile || ''
+      }
+    }
+    return request.post('/api/inspection/execute', backendRequest)
   },
 
   // 获取执行状态

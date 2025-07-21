@@ -2,6 +2,7 @@ package backend
 
 import (
 	"embed"
+	"log"
 	"net/http"
 	"strconv"
 
