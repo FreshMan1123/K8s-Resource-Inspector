@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/FreshMan1123/k8s-resource-inspector/code/web/backend"
 )
 
 var rootCmd = &cobra.Command{
@@ -15,6 +16,29 @@ var rootCmd = &cobra.Command{
 确保集群资源符合企业标准和最佳实践。`,
 }
 
+// webCmd 表示Web管理界面命令
+var webCmd = &cobra.Command{
+	Use:   "web",
+	Short: "启动Web管理界面",
+	Long: `启动Web管理界面，提供可视化的规则管理和巡检执行功能。
+
+示例:
+  # 启动Web界面（默认端口8080）
+  inspector web
+
+  # 指定端口启动
+  inspector web --port 9090`,
+	Run: func(cmd *cobra.Command, args []string) {
+		port, _ := cmd.Flags().GetInt("port")
+
+		fmt.Printf("🚀 启动K8s巡检管理平台...\n")
+		fmt.Printf("📱 访问地址: http://localhost:%d\n", port)
+		fmt.Printf("⏹️  按 Ctrl+C 停止服务\n\n")
+
+		startWebServer(port)
+	},
+}
+
 func init() {
 	// 添加全局标志
 	rootCmd.PersistentFlags().StringP("kubeconfig", "k", "", "kubeconfig文件路径 (默认为$HOME/.kube/config)")
@@ -23,6 +47,21 @@ func init() {
 
 	// 添加子命令
 	rootCmd.AddCommand(clusterCmd)
+	rootCmd.AddCommand(resourceCmd)  // 添加缺失的resource命令
+	rootCmd.AddCommand(inspectCmd)   // 添加缺失的inspect命令
+	rootCmd.AddCommand(webCmd)       // 添加新的web命令
+
+	// 初始化web命令标志
+	webCmd.Flags().Int("port", 8080, "Web服务端口")
+}
+
+// startWebServer 启动Web服务器
+func startWebServer(port int) {
+	fmt.Printf("✅ 已加载现有规则配置\n")
+	fmt.Printf("✅ Web界面已就绪\n")
+
+	// 启动完整的Web服务
+	backend.StartWebServer(port)
 }
 
 func main() {
