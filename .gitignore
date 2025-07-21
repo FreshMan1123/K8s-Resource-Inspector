@@ -34,7 +34,6 @@ k8s-config/*.yaml
 
 # Build output
 bin/
-dist/
 
 # Log files
 *.log
@@ -53,3 +52,14 @@ Desktop.ini
 
 # Trivy binaries directory (created and populated by CI/CD)
 code/internal/scanner/binaries/
+
+# Node.js dependencies and build artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.npm
+.yarn-integrity
+
