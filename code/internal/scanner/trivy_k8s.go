@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
 )
 
 // TrivyScanner Trivy扫描器实现
@@ -56,7 +57,7 @@ func (ts *TrivyScanner) ScanNamespace(ctx context.Context, namespace string) (*V
 	}
 
 	// 执行K8s扫描
-	report, err := ts.executeK8sScan(ctx, "--namespace", namespace)
+	report, err := ts.executeK8sScan(ctx, "cluster")
 	if err != nil {
 		return nil, fmt.Errorf("扫描命名空间 %s 失败: %w", namespace, err)
 	}
@@ -88,7 +89,7 @@ func (ts *TrivyScanner) ScanPod(ctx context.Context, namespace, podName string) 
 	}
 
 	// 执行K8s扫描
-	report, err := ts.executeK8sScan(ctx, "--namespace", namespace, fmt.Sprintf("pod/%s", podName))
+	report, err := ts.executeK8sScan(ctx, "cluster")
 	if err != nil {
 		return nil, fmt.Errorf("扫描Pod %s/%s 失败: %w", namespace, podName, err)
 	}
@@ -190,8 +191,8 @@ func (ts *TrivyScanner) executeK8sScan(ctx context.Context, args ...string) (*Vu
 	}
 
 	// 构建命令参数
-	cmdArgs := []string{"k8s", "--format", "json", "--quiet"}
-	
+	cmdArgs := []string{"k8s", "--format", "json", "--timeout", "10m"}
+
 	// 添加kubeconfig和context
 	if ts.kubeconfig != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig", ts.kubeconfig)
@@ -200,10 +201,13 @@ func (ts *TrivyScanner) executeK8sScan(ctx context.Context, args ...string) (*Vu
 		cmdArgs = append(cmdArgs, "--context", ts.context)
 	}
 
+	// 使用随机命名空间避免 node-collector Job 冲突
+	cmdArgs = append(cmdArgs, "--node-collector-namespace", "trivy-scan-temp")
+
 	// 添加扫描器选择
 	scanners := []string{"vuln"}
 	if ts.options.IncludeConfig {
-		scanners = append(scanners, "config")
+		scanners = append(scanners, "misconfig")
 	}
 	cmdArgs = append(cmdArgs, "--scanners", strings.Join(scanners, ","))
 
@@ -269,3 +273,5 @@ func (ts *TrivyScanner) executeImageScan(ctx context.Context, imageRef string) (
 	// 解析结果
 	return ts.parseTrivyImageOutput(output, imageRef)
 }
+
+

@@ -32,6 +32,14 @@ func (tbm *TrivyBinaryManager) ExtractBinary() error {
 		return nil // 已提取且有效
 	}
 
+	// 1. 首先尝试使用本地文件
+	if localPath := tbm.getLocalBinaryPath(); localPath != "" && tbm.isLocalBinaryValid(localPath) {
+		tbm.extractedPath = localPath
+		tbm.extracted = true
+		return nil
+	}
+
+	// 2. 回退到嵌入文件提取逻辑
 	// 确定当前平台的二进制文件名
 	embeddedFileName, extractedFileName, err := tbm.getPlatformBinaryNames()
 	if err != nil {
@@ -133,4 +141,73 @@ func GetSupportedPlatforms() []string {
 // GetCurrentPlatform 获取当前平台标识
 func GetCurrentPlatform() string {
 	return fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+}
+
+// getLocalBinaryPath 获取本地二进制文件路径
+func (tbm *TrivyBinaryManager) getLocalBinaryPath() string {
+	// 确定当前平台的本地二进制文件名（使用实际的本地文件名格式）
+	var localFileName string
+	switch runtime.GOOS {
+	case "linux":
+		localFileName = "trivy-linux-amd64"
+	case "darwin":
+		localFileName = "trivy-darwin-amd64"
+	case "windows":
+		localFileName = "trivy-windows-amd64.exe"
+	default:
+		return ""
+	}
+
+	// 构建本地文件路径，支持多种可能的工作目录
+	possiblePaths := []string{
+		// 从项目根目录执行
+		filepath.Join("code", "internal", "scanner", "binaries", localFileName),
+		// 从 code 目录执行
+		filepath.Join("internal", "scanner", "binaries", localFileName),
+		// 从当前目录执行（如果就在 scanner 目录）
+		filepath.Join("binaries", localFileName),
+		// 绝对路径（如果设置了环境变量等）
+		filepath.Join(".", "code", "internal", "scanner", "binaries", localFileName),
+	}
+
+	// 检查每个可能的路径
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			// 直接返回相对路径，避免绝对路径可能的性能问题
+			return path
+		}
+	}
+
+	return ""
+}
+
+// isLocalBinaryValid 检查本地二进制文件是否有效
+func (tbm *TrivyBinaryManager) isLocalBinaryValid(path string) bool {
+	if path == "" {
+		return false
+	}
+
+	// 检查文件是否存在
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	// 检查是否是普通文件
+	if !info.Mode().IsRegular() {
+		return false
+	}
+
+	// 检查文件大小（Trivy二进制文件应该比较大）
+	if info.Size() < 1024*1024 { // 小于1MB可能不是有效的Trivy二进制
+		return false
+	}
+
+	// 在Windows上检查是否有执行权限
+	if runtime.GOOS == "windows" {
+		return filepath.Ext(path) == ".exe"
+	}
+
+	// 在Unix系统上检查执行权限
+	return info.Mode()&0111 != 0
 }
